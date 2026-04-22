@@ -15,12 +15,19 @@ MCP Feedback Enhanced Web UI 模組
 - 本地和遠端環境適配
 """
 
-from .main import WebUIManager, get_web_ui_manager, launch_web_feedback_ui, stop_web_ui
+from .main import (
+    WebUIManager,
+    get_web_ui_manager,
+    launch_web_feedback_ui,
+    set_web_ui_manager,
+    stop_web_ui,
+)
 
 
 __all__ = [
     "WebUIManager",
     "get_web_ui_manager",
     "launch_web_feedback_ui",
+    "set_web_ui_manager",
     "stop_web_ui",
 ]

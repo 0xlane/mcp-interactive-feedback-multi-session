@@ -14,6 +14,7 @@
 | [API 參考文檔](./api-reference.md) | MCP 工具接口和 WebSocket API 規範 | API 使用者、前端開發 |
 | [部署指南](./deployment-guide.md) | 環境配置、部署選項和故障排除 | 運維人員、系統管理員 |
 | [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) 🚧 | 由 stdio 單會話轉為 HTTP 單守護多會話的設計提案（v3.0.0 規劃） | 架構師、核心開發 |
+| [階段 2 HTTP Daemon 使用指南](./phase2-http-daemon-usage.md) 🆕 | `uvx serve --http` 啟動、`mcp.json` 改造、端點清單 | 早期使用者、開發者 |
 
 ### 🏗️ 架構概覽
 

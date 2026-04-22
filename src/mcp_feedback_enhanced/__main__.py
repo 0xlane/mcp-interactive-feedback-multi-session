@@ -6,8 +6,9 @@ MCP Interactive Feedback Enhanced - 主程式入口
 此檔案允許套件透過 `python -m mcp_feedback_enhanced` 執行。
 
 使用方法:
-  python -m mcp_feedback_enhanced        # 啟動 MCP 伺服器
-  python -m mcp_feedback_enhanced test   # 執行測試
+  python -m mcp_feedback_enhanced                 # 啟動 stdio MCP 伺服器（過渡保留）
+  python -m mcp_feedback_enhanced serve --http    # 啟動 HTTP 單實例 daemon（推薦）
+  python -m mcp_feedback_enhanced test            # 執行測試
 """
 
 import argparse
@@ -39,8 +40,47 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # 伺服器命令（預設）
-    subparsers.add_parser("server", help="啟動 MCP 伺服器（預設）")
+    # 伺服器命令（stdio，過渡保留，預設）
+    subparsers.add_parser(
+        "server",
+        help="啟動 stdio MCP 伺服器（過渡保留，將於後續階段移除）",
+    )
+
+    # HTTP daemon 命令（多會話單實例，推薦）
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="啟動 HTTP 單實例多會話 daemon（推薦，對應新版 mcp.json 使用方式）",
+    )
+    serve_parser.add_argument(
+        "--http",
+        action="store_true",
+        help="以 HTTP 模式啟動（目前 serve 子命令僅支援 HTTP，保留此旗標以便未來擴充）",
+    )
+    serve_parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="綁定主機（預設 127.0.0.1，僅建議本地使用）",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="綁定端口（預設 8765，若被佔用將直接失敗，不做自動遞增）",
+    )
+    serve_parser.add_argument(
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+        help="uvicorn 日誌級別（預設 info）",
+    )
+    serve_parser.add_argument(
+        "--pid-file",
+        type=str,
+        default=None,
+        help="PID 文件路徑，覆寫預設的 ~/.config/mcp-feedback-enhanced/daemon.pid",
+    )
 
     # 測試命令
     test_parser = subparsers.add_parser("test", help="執行測試")
@@ -63,6 +103,8 @@ def main():
         run_tests(args)
     elif args.command == "version":
         show_version()
+    elif args.command == "serve":
+        run_serve_http(args)
     elif args.command == "server" or args.command is None:
         run_server()
     else:
@@ -72,10 +114,40 @@ def main():
 
 
 def run_server():
-    """啟動 MCP 伺服器"""
+    """啟動 stdio MCP 伺服器（過渡保留）"""
     from .server import main as server_main
 
     return server_main()
+
+
+def run_serve_http(args):
+    """啟動 HTTP 單實例多會話 daemon。"""
+    # --http 目前僅作為明確標記，即使未傳也默認走 HTTP 分支
+    from pathlib import Path
+
+    from .daemon import serve_http
+    from .utils.pid_lock import AlreadyRunningError
+
+    pid_path = Path(args.pid_file).expanduser() if args.pid_file else None
+
+    try:
+        serve_http(
+            host=args.host,
+            port=args.port,
+            log_level=args.log_level,
+            pid_path=pid_path,
+        )
+    except AlreadyRunningError as exc:
+        # 將鎖衝突轉成清晰的使用者訊息 + 非零退出碼
+        print(f"✗ {exc}", file=sys.stderr)
+        print(
+            "  提示：若確認前一個 daemon 已死，可手動刪除 PID 文件後重試。",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    except KeyboardInterrupt:
+        # uvicorn 的 Ctrl-C 已自行處理，這裡只吸收堆疊
+        pass
 
 
 def run_tests(args):

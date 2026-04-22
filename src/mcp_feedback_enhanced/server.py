@@ -433,6 +433,16 @@ async def interactive_feedback(
         str, Field(description="AI 工作完成的摘要說明")
     ] = "我已完成了您請求的任務。",
     timeout: Annotated[int, Field(description="等待用戶回饋的超時時間（秒）")] = 3600,
+    title: Annotated[
+        str | None,
+        Field(
+            description=(
+                "會話標題（可選），建議用短句描述當前任務主題，例如 "
+                "'修復登錄重定向' 或 'API 文檔補全'，用於在多會話側欄中識別。"
+                "未提供時前端會以 project_directory 的 basename 作為兜底。"
+            )
+        ),
+    ] = None,
 ) -> list:
     """Interactive feedback collection tool for LLM agents.
 
@@ -442,11 +452,13 @@ async def interactive_feedback(
     3. Whenever user feedback is received, if the feedback content is not empty, you must call this tool again and adjust behavior based on the feedback content.
     4. Only when the user explicitly indicates "end" or "no more interaction needed" can you stop calling this tool, and the process is considered complete.
     5. You should summarize what have done, and provide project directory through args to let user know what you have done to provide feedback for next step.
+    6. When working on multiple parallel tasks (e.g., multiple Cursor Chats), pass a concise `title` (5-15 chars, e.g. "修復登錄重定向") so the user can distinguish sessions in the sidebar.
 
     Args:
         project_directory: Project directory path for context
         summary: Summary of AI work completed for user review
         timeout: Timeout in seconds for waiting user feedback (default: 600 seconds)
+        title: Optional short session title for multi-session sidebar display
 
     Returns:
         list: List containing TextContent and MCPImage objects representing user feedback
@@ -481,13 +493,13 @@ async def interactive_feedback(
                 )
 
         # 使用 Web 模式
-        debug_log(f"回饋模式: web，超時時間: {effective_timeout} 秒")
+        debug_log(f"回饋模式: web，超時時間: {effective_timeout} 秒，標題: {title!r}")
 
         result = await launch_web_feedback_ui(
-            project_directory, summary, effective_timeout
+            project_directory, summary, effective_timeout, title=title
         )
 
-        # 處理取消情況
+        # 處理取消情況（使用者手動歸檔會讓 wait_for_feedback 返回空 dict）
         if not result:
             return [TextContent(type="text", text="用戶取消了回饋。")]
 
@@ -538,26 +550,31 @@ async def interactive_feedback(
         return [TextContent(type="text", text=user_error_msg)]
 
 
-async def launch_web_feedback_ui(project_dir: str, summary: str, timeout: int) -> dict:
+async def launch_web_feedback_ui(
+    project_dir: str,
+    summary: str,
+    timeout: int,
+    title: str | None = None,
+) -> dict:
     """
-    啟動 Web UI 收集回饋，支援自訂超時時間
+    啟動 Web UI 收集回饋，支援自訂超時時間和會話標題
 
     Args:
         project_dir: 專案目錄路徑
         summary: AI 工作摘要
         timeout: 超時時間（秒）
+        title: 會話標題（可選）
 
     Returns:
-        dict: 收集到的回饋資料
+        dict: 收集到的回饋資料（空 dict 表示使用者取消）
     """
-    debug_log(f"啟動 Web UI 介面，超時時間: {timeout} 秒")
+    debug_log(f"啟動 Web UI 介面，超時時間: {timeout} 秒，標題: {title!r}")
 
     try:
         # 使用新的 web 模組
         from .web import launch_web_feedback_ui as web_launch
 
-        # 傳遞 timeout 參數給 Web UI
-        return await web_launch(project_dir, summary, timeout)
+        return await web_launch(project_dir, summary, timeout, title=title)
     except ImportError as e:
         # 使用統一錯誤處理
         error_id = ErrorHandler.log_error_with_context(

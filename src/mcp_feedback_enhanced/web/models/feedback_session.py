@@ -39,6 +39,7 @@ class SessionStatus(Enum):
     ERROR = "error"  # 錯誤（終態）
     TIMEOUT = "timeout"  # 超時（終態）
     EXPIRED = "expired"  # 已過期（終態）
+    CANCELED = "canceled"  # 用戶主動取消（終態，多會話模式新增）
 
 
 class CleanupReason(Enum):
@@ -126,10 +127,13 @@ class WebFeedbackSession:
         summary: str,
         auto_cleanup_delay: int = 3600,
         max_idle_time: int = 3600,
+        title: str | None = None,
     ):
         self.session_id = session_id
         self.project_directory = project_directory
         self.summary = summary
+        # AI 傳入的會話標題，用於多會話側欄識別；未傳時前端以項目目錄 basename 兜底
+        self.title: str | None = title
         self.websocket: WebSocket | None = None
         self.feedback_result: str | None = None
         self.images: list[dict] = []
@@ -211,6 +215,7 @@ class WebFeedbackSession:
             SessionStatus.ERROR: None,  # 終態
             SessionStatus.TIMEOUT: None,  # 終態
             SessionStatus.EXPIRED: None,  # 終態
+            SessionStatus.CANCELED: None,  # 終態
         }
 
         next_status = next_status_map.get(self.status)
@@ -280,7 +285,47 @@ class WebFeedbackSession:
             SessionStatus.ERROR,
             SessionStatus.TIMEOUT,
             SessionStatus.EXPIRED,
+            SessionStatus.CANCELED,
         ]
+
+    def cancel(self, message: str = "使用者已取消此會話") -> bool:
+        """取消會話（多會話模式：使用者在 UI 主動歸檔等待中/活躍中的會話）。
+
+        會將狀態設為 CANCELED 並立即解鎖 wait_for_feedback()，讓對應的 MCP
+        tool 呼叫快速返回，調用方據 feedback_result 仍為 None 判定為取消。
+
+        取消條件：
+        - 會話尚未處於終態（COMPLETED / ERROR / TIMEOUT / EXPIRED / CANCELED）
+        - 會話尚未送出過反饋（feedback_completed 未被觸發）
+
+        用 ``feedback_completed.is_set()`` 判斷而非僅檢查 FEEDBACK_SUBMITTED 枚舉，
+        以涵蓋 submit_feedback 僅將狀態從 WAITING 推進到 ACTIVE 的實際行為。
+
+        Returns:
+            bool: True 表示成功取消；False 表示會話已在終態或已送出反饋，無需取消。
+        """
+        if self.is_terminal():
+            debug_log(
+                f"會話 {self.session_id} 已處於終態 {self.status.value}，無需取消"
+            )
+            return False
+        if self.feedback_completed.is_set():
+            debug_log(
+                f"會話 {self.session_id} 已送出反饋（狀態 {self.status.value}），無需取消"
+            )
+            return False
+
+        old_status = self.status
+        self.status = SessionStatus.CANCELED
+        self.status_message = message
+        self.last_activity = time.time()
+        self.feedback_result = None
+        self.feedback_completed.set()
+
+        debug_log(
+            f"🚫 會話 {self.session_id} 已取消: {old_status.value} → canceled - {message}"
+        )
+        return True
 
     def get_status_info(self) -> dict[str, Any]:
         """獲取會話狀態信息"""
@@ -493,6 +538,16 @@ class WebFeedbackSession:
                     debug_log(f"會話 {self.session_id} 因用戶設定超時而結束")
                     await self._cleanup_resources_on_timeout()
                     raise TimeoutError("會話已因用戶設定的超時而關閉")
+
+                # 檢查是否被使用者主動取消（CANCELED 終態）
+                if self.status == SessionStatus.CANCELED:
+                    debug_log(
+                        f"會話 {self.session_id} 被使用者取消，wait_for_feedback 返回空結果"
+                    )
+                    # 用 MANUAL 原因清理，避免覆寫 CANCELED 狀態
+                    await self._cleanup_resources_enhanced(CleanupReason.MANUAL)
+                    # 返回空 dict，上層 `if not result:` 會識別為取消
+                    return {}
 
                 debug_log(f"會話 {self.session_id} 收到用戶回饋")
                 return {
@@ -868,15 +923,16 @@ class WebFeedbackSession:
                 resources_cleaned += logs_count + images_count
                 debug_log(f"清理了 {logs_count} 條日誌和 {images_count} 張圖片")
 
-            # 6. 更新會話狀態
-            if reason == CleanupReason.EXPIRED:
-                self.status = SessionStatus.EXPIRED
-            elif reason == CleanupReason.TIMEOUT:
-                self.status = SessionStatus.TIMEOUT
-            elif reason == CleanupReason.ERROR:
-                self.status = SessionStatus.ERROR
-            else:
-                self.status = SessionStatus.COMPLETED
+            # 6. 更新會話狀態（若已處於終態則保留，不覆蓋）
+            if not self.is_terminal():
+                if reason == CleanupReason.EXPIRED:
+                    self.status = SessionStatus.EXPIRED
+                elif reason == CleanupReason.TIMEOUT:
+                    self.status = SessionStatus.TIMEOUT
+                elif reason == CleanupReason.ERROR:
+                    self.status = SessionStatus.ERROR
+                else:
+                    self.status = SessionStatus.COMPLETED
 
             # 7. 調用清理回調函數
             for callback in self.cleanup_callbacks:
@@ -1004,16 +1060,17 @@ class WebFeedbackSession:
             if not preserve_websocket:
                 self.feedback_completed.set()
 
-            # 5. 更新狀態
+            # 5. 更新狀態（若已處於終態則保留，不覆蓋）
             if not preserve_websocket:
-                if reason == CleanupReason.EXPIRED:
-                    self.status = SessionStatus.EXPIRED
-                elif reason == CleanupReason.TIMEOUT:
-                    self.status = SessionStatus.TIMEOUT
-                elif reason == CleanupReason.ERROR:
-                    self.status = SessionStatus.ERROR
-                else:
-                    self.status = SessionStatus.COMPLETED
+                if not self.is_terminal():
+                    if reason == CleanupReason.EXPIRED:
+                        self.status = SessionStatus.EXPIRED
+                    elif reason == CleanupReason.TIMEOUT:
+                        self.status = SessionStatus.TIMEOUT
+                    elif reason == CleanupReason.ERROR:
+                        self.status = SessionStatus.ERROR
+                    else:
+                        self.status = SessionStatus.COMPLETED
 
                 self._cleanup_done = True
 

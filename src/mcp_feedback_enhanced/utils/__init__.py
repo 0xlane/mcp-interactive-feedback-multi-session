@@ -6,6 +6,7 @@ MCP Feedback Enhanced 工具模組
 """
 
 from .error_handler import ErrorHandler, ErrorType
+from .pid_lock import AlreadyRunningError, DaemonPidLock, default_pid_path
 from .resource_manager import (
     ResourceManager,
     cleanup_all_resources,
@@ -17,12 +18,15 @@ from .resource_manager import (
 
 
 __all__ = [
+    "AlreadyRunningError",
+    "DaemonPidLock",
     "ErrorHandler",
     "ErrorType",
     "ResourceManager",
     "cleanup_all_resources",
     "create_temp_dir",
     "create_temp_file",
+    "default_pid_path",
     "get_resource_manager",
     "register_process",
 ]

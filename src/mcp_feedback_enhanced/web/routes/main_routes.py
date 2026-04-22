@@ -190,6 +190,7 @@ def setup_routes(manager: "WebUIManager"):
                     "session_id": session.session_id,
                     "project_directory": session.project_directory,
                     "summary": session.summary,
+                    "title": session.title,  # 階段 1 新增：AI 傳入的會話標題（可能為 None）
                     "status": session.status.value,
                     "status_message": session.status_message,
                     "created_at": int(session.created_at * 1000),  # 轉換為毫秒
@@ -214,6 +215,76 @@ def setup_routes(manager: "WebUIManager"):
                 content={
                     "error": f"Failed to get sessions: {e!s}",
                     "messageCode": get_msg_code("get_sessions_failed"),
+                },
+            )
+
+    @manager.app.post("/api/sessions/{session_id}/archive")
+    async def archive_session(session_id: str, request: Request):
+        """手動歸檔會話（階段 1 新增，多會話模式）。
+
+        行為依會話當前狀態而定：
+        - WAITING / ACTIVE：呼叫 ``session.cancel()`` 解鎖 ``wait_for_feedback``，
+          對應的 MCP tool 呼叫會返回「用戶取消了反饋」給 AI Agent。
+        - FEEDBACK_SUBMITTED / 終態：僅視作 UI 層歸檔，不變動狀態。
+
+        若歸檔的是當前活躍會話，活躍指針會自動轉給另一個非終態會話（或置空）。
+        """
+        try:
+            # 可選：body 中可帶 reason 作為歸檔原因
+            reason: str | None = None
+            try:
+                body = await request.json()
+                if isinstance(body, dict):
+                    raw = body.get("reason")
+                    if isinstance(raw, str) and raw.strip():
+                        reason = raw.strip()
+            except Exception:
+                reason = None
+
+            message = reason or "使用者已手動歸檔此會話"
+
+            if session_id not in manager.sessions:
+                return JSONResponse(
+                    status_code=404,
+                    content={
+                        "error": "Session not found",
+                        "session_id": session_id,
+                    },
+                )
+
+            session = manager.sessions[session_id]
+            previous_status = session.status.value
+
+            ok = manager.cancel_session(session_id, message=message)
+            if not ok:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error": "Failed to archive session",
+                        "session_id": session_id,
+                    },
+                )
+
+            debug_log(
+                f"會話 {session_id} 已歸檔（previous={previous_status}, "
+                f"current={session.status.value}）"
+            )
+            return JSONResponse(
+                content={
+                    "status": "success",
+                    "session_id": session_id,
+                    "previous_status": previous_status,
+                    "current_status": session.status.value,
+                }
+            )
+
+        except Exception as e:
+            debug_log(f"歸檔會話 {session_id} 失敗: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": f"Archive failed: {e!s}",
                 },
             )
 

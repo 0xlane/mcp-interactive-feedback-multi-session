@@ -1,8 +1,8 @@
 # 多会话 HTTP 模式重构设计
 
-> **状态**：设计已定稿，待进入实施
+> **状态**：阶段 2 已完成；阶段 3（前端双栏 UI）待开工
 > **创建日期**：2026-04-22
-> **最后更新**：2026-04-22（所有决议事项已确认，见 §10）
+> **最后更新**：2026-04-22（阶段 2 实施完成：HTTP daemon + PID 锁 + mcp.http_app 挂载 + `serve` 子命令）
 > **涉及范围**：MCP 传输层、Web UI 管理层、前端交互层
 > **预期版本**：v3.0.0（**破坏性变更**：完全移除 stdio 模式，不保留兜底）
 
@@ -435,14 +435,37 @@ mcp-interactive-feedback serve --http
 
 **验收**：服务器能并发持有多个会话且相互不干扰；UI 暂时只显示最新会话（与现行外观一致）。
 
-### 阶段 2：HTTP MCP 传输 + 守护模式
+### 阶段 2：HTTP MCP 传输 + 守护模式 ✅ 已完成
 
-- `mcp.http_app()` 挂载；
-- `serve --http` 子命令；
-- PID 锁、端口冲突报错；
-- `mcp.json` 迁移示例（README / 用户指南）。
+**落地清单**：
 
-**验收**：单守护进程可同时服务多个 Agent 的并发 MCP 调用。
+- ✅ `src/mcp_feedback_enhanced/daemon.py`：`build_daemon_app(host, port)` 把
+  `mcp.http_app(path="/")` 挂载到 FastAPI `/mcp`，`serve_http(host, port, pid_path)`
+  前台运行 uvicorn；
+- ✅ `src/mcp_feedback_enhanced/utils/pid_lock.py`：`DaemonPidLock` 单例锁，
+  默认写 `~/.config/mcp-feedback-enhanced/daemon.pid`，支持 stale lock 回收；
+  清理策略依赖 `atexit`（uvicorn 对 SIGINT/SIGTERM 的优雅关机会触发
+  正常退出链），不自装 signal handler 以免与 pytest / ResourceManager /
+  uvicorn 的清理链相互干扰；`MCP_FEEDBACK_PID_FILE` 环境变量可覆盖默认路径；
+- ✅ `WebUIManager` 新增 `is_daemon` + `lifespan` 参数，daemon 模式下跳过
+  `start_server` / 端口自动递增 / `smart_open_browser`；
+- ✅ `launch_web_feedback_ui` daemon 分支：仅 `create_session` +
+  `notify_existing_tab_to_refresh`，不再自启 uvicorn；
+- ✅ `__main__.py` 新增 `serve` 子命令（`--http / --host / --port /
+  --log-level / --pid-file`），`AlreadyRunningError` 转成非零退出码；
+- ✅ 集成测试 `tests/integration/test_daemon_http.py`（8 个 test，含
+  `/` / `/api/all-sessions` / `/mcp/ initialize` / `tools/list` / 全局
+  manager 注入 / PID 锁冲突）+ 单元测试 `tests/unit/test_pid_lock.py`
+  （12 个 test）；
+- ✅ 使用指南 [`phase2-http-daemon-usage.md`](./phase2-http-daemon-usage.md)
+  （`uvx serve --http` 启动、`mcp.json` 迁移样例、端点清单、FAQ）；
+- ⏳ 三语种 README 正式更新推迟到阶段 5 统一做。
+
+**验收**：单守护进程可同时服务多个 Agent 的并发 MCP 调用；经过真实
+`python -m mcp_feedback_enhanced serve --http --port 18765` 子进程 + `curl`
+握手验证 MCP initialize / tools/list 全绿；全量 `pytest` 跑下来只有 7 个
+pre-existing failure（与 `main` baseline 完全一致），Phase 2 新加的 33 个
+test 全过，没有引入新回归。
 
 ### 阶段 3：前端双栏 UI
 

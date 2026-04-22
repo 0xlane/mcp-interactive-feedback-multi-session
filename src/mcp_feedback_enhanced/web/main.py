@@ -15,7 +15,7 @@ import uuid
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 # 抑制 uvicorn 内部 websockets legacy 弃用警告（uvicorn 尚未完全迁移到新 API）
 warnings.filterwarnings("ignore", message="websockets.legacy", category=DeprecationWarning)
@@ -39,76 +39,125 @@ from .utils.port_manager import PortManager
 
 
 class WebUIManager:
-    """Web UI 管理器 - 重構為單一活躍會話模式"""
+    """Web UI 管理器 - 多會話模式（階段 1：後端多會話化，前端暫保持單活躍視圖）
 
-    def __init__(self, host: str = "127.0.0.1", port: int | None = None):
-        # 確定偏好主機：環境變數 > 參數 > 預設值 127.0.0.1
-        env_host = os.getenv("MCP_WEB_HOST")
-        if env_host:
-            self.host = env_host
-            debug_log(f"使用環境變數指定的主機: {self.host}")
-        else:
+    會話由 ``self.sessions`` 字典持有，多個會話可並發存活並各自獨立等待使用者回饋。
+    ``self.current_session`` 為向下相容的 ``@property``，永遠返回 ``_active_session_id``
+    指向的會話，即「前端目前顯示」的那一個。新會話建立時 ``_active_session_id`` 自動
+    指向新會話，但舊會話不再被強制 next_step 或清理，仍可被查詢與歸檔。
+    """
+
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int | None = None,
+        *,
+        is_daemon: bool = False,
+        lifespan: Callable[[Any], Any] | None = None,
+    ):
+        """初始化 WebUIManager。
+
+        Args:
+            host: 綁定主機。
+            port: 綁定端口；``None`` 時自動探測。
+            is_daemon: 是否以 daemon（HTTP 單實例）模式運行。daemon 模式下：
+                - 必須使用呼叫方指定的 ``host`` / ``port``，不做自動遞增；
+                - 不會自行 ``start_server()`` / ``smart_open_browser()``，
+                  進程的 ASGI 伺服器由 :mod:`mcp_feedback_enhanced.daemon` 管理；
+                - ``MCP_WEB_HOST`` / ``MCP_WEB_PORT`` 環境變數被忽略（由 CLI 參數
+                  覆寫）。
+            lifespan: 傳給底層 ``FastAPI`` 的 lifespan context manager，通常由
+                daemon 構建時用來把 MCP sub-app 的 lifespan 接進來。
+        """
+        self.is_daemon = is_daemon
+
+        if is_daemon:
+            # Daemon 模式：完全信任傳入參數，不再讀環境變數，不做自動遞增
             self.host = host
-            debug_log(f"未設定 MCP_WEB_HOST 環境變數，使用預設主機 {self.host}")
-
-        # 確定偏好端口：環境變數 > 參數 > 預設值 8765
-        preferred_port = 8765
-
-        # 檢查環境變數 MCP_WEB_PORT
-        env_port = os.getenv("MCP_WEB_PORT")
-        if env_port:
-            try:
-                custom_port = int(env_port)
-                if custom_port == 0:
-                    # 特殊值 0 表示使用系統自動分配的端口
-                    preferred_port = 0
-                    debug_log("使用環境變數指定的自動端口分配 (0)")
-                elif 1024 <= custom_port <= 65535:
-                    preferred_port = custom_port
-                    debug_log(f"使用環境變數指定的端口: {preferred_port}")
-                else:
-                    debug_log(
-                        f"MCP_WEB_PORT 值無效 ({custom_port})，必須在 1024-65535 範圍內或為 0，使用預設端口 8765"
-                    )
-            except ValueError:
-                debug_log(
-                    f"MCP_WEB_PORT 格式錯誤 ({env_port})，必須為數字，使用預設端口 8765"
-                )
-        else:
-            debug_log(f"未設定 MCP_WEB_PORT 環境變數，使用預設端口 {preferred_port}")
-
-        # 使用增強的端口管理，測試模式下禁用自動清理避免權限問題
-        auto_cleanup = os.environ.get("MCP_TEST_MODE", "").lower() != "true"
-
-        if port is not None:
-            # 如果明確指定了端口，使用指定的端口
-            self.port = port
-            # 檢查指定端口是否可用
-            if not PortManager.is_port_available(self.host, self.port):
-                debug_log(f"警告：指定的端口 {self.port} 可能已被佔用")
-                # 在測試模式下，嘗試尋找替代端口
-                if os.environ.get("MCP_TEST_MODE", "").lower() == "true":
-                    debug_log("測試模式：自動尋找替代端口")
-                    original_port = self.port
-                    self.port = PortManager.find_free_port_enhanced(
-                        preferred_port=self.port, auto_cleanup=False, host=self.host
-                    )
-                    if self.port != original_port:
-                        debug_log(f"自動切換到可用端口: {original_port} → {self.port}")
-        elif preferred_port == 0:
-            # 如果偏好端口為 0，使用系統自動分配
-            import socket
-
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((self.host, 0))
-                self.port = s.getsockname()[1]
-            debug_log(f"系統自動分配端口: {self.port}")
-        else:
-            # 使用增強的端口管理
-            self.port = PortManager.find_free_port_enhanced(
-                preferred_port=preferred_port, auto_cleanup=auto_cleanup, host=self.host
+            self.port = port if port is not None else 8765
+            debug_log(
+                f"Daemon 模式：使用固定主機/端口 {self.host}:{self.port}（不做端口自動探測）"
             )
-        self.app = FastAPI(title="MCP Feedback Enhanced")
+        else:
+            # 確定偏好主機：環境變數 > 參數 > 預設值 127.0.0.1
+            env_host = os.getenv("MCP_WEB_HOST")
+            if env_host:
+                self.host = env_host
+                debug_log(f"使用環境變數指定的主機: {self.host}")
+            else:
+                self.host = host
+                debug_log(f"未設定 MCP_WEB_HOST 環境變數，使用預設主機 {self.host}")
+
+            # 確定偏好端口：環境變數 > 參數 > 預設值 8765
+            preferred_port = 8765
+
+            # 檢查環境變數 MCP_WEB_PORT
+            env_port = os.getenv("MCP_WEB_PORT")
+            if env_port:
+                try:
+                    custom_port = int(env_port)
+                    if custom_port == 0:
+                        # 特殊值 0 表示使用系統自動分配的端口
+                        preferred_port = 0
+                        debug_log("使用環境變數指定的自動端口分配 (0)")
+                    elif 1024 <= custom_port <= 65535:
+                        preferred_port = custom_port
+                        debug_log(f"使用環境變數指定的端口: {preferred_port}")
+                    else:
+                        debug_log(
+                            f"MCP_WEB_PORT 值無效 ({custom_port})，必須在 1024-65535 範圍內或為 0，使用預設端口 8765"
+                        )
+                except ValueError:
+                    debug_log(
+                        f"MCP_WEB_PORT 格式錯誤 ({env_port})，必須為數字，使用預設端口 8765"
+                    )
+            else:
+                debug_log(
+                    f"未設定 MCP_WEB_PORT 環境變數，使用預設端口 {preferred_port}"
+                )
+
+            # 使用增強的端口管理，測試模式下禁用自動清理避免權限問題
+            auto_cleanup = os.environ.get("MCP_TEST_MODE", "").lower() != "true"
+
+            if port is not None:
+                # 如果明確指定了端口，使用指定的端口
+                self.port = port
+                # 檢查指定端口是否可用
+                if not PortManager.is_port_available(self.host, self.port):
+                    debug_log(f"警告：指定的端口 {self.port} 可能已被佔用")
+                    # 在測試模式下，嘗試尋找替代端口
+                    if os.environ.get("MCP_TEST_MODE", "").lower() == "true":
+                        debug_log("測試模式：自動尋找替代端口")
+                        original_port = self.port
+                        self.port = PortManager.find_free_port_enhanced(
+                            preferred_port=self.port,
+                            auto_cleanup=False,
+                            host=self.host,
+                        )
+                        if self.port != original_port:
+                            debug_log(
+                                f"自動切換到可用端口: {original_port} → {self.port}"
+                            )
+            elif preferred_port == 0:
+                # 如果偏好端口為 0，使用系統自動分配
+                import socket
+
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind((self.host, 0))
+                    self.port = s.getsockname()[1]
+                debug_log(f"系統自動分配端口: {self.port}")
+            else:
+                # 使用增強的端口管理
+                self.port = PortManager.find_free_port_enhanced(
+                    preferred_port=preferred_port,
+                    auto_cleanup=auto_cleanup,
+                    host=self.host,
+                )
+
+        fastapi_kwargs: dict[str, Any] = {"title": "MCP Feedback Enhanced"}
+        if lifespan is not None:
+            fastapi_kwargs["lifespan"] = lifespan
+        self.app = FastAPI(**fastapi_kwargs)
 
         # 設置壓縮和緩存中間件
         self._setup_compression_middleware()
@@ -116,9 +165,10 @@ class WebUIManager:
         # 設置內存監控
         self._setup_memory_monitoring()
 
-        # 重構：使用單一活躍會話而非會話字典
-        self.current_session: WebFeedbackSession | None = None
-        self.sessions: dict[str, WebFeedbackSession] = {}  # 保留用於向後兼容
+        # 階段 1：多會話字典 + 活躍會話指針（相容舊 current_session 介面）
+        self.sessions: dict[str, WebFeedbackSession] = {}
+        # _active_session_id：前端目前顯示的會話 id（由 current_session property 存取）
+        self._active_session_id: str | None = None
 
         # 全局標籤頁狀態管理 - 跨會話保持
         self.global_active_tabs: dict[str, dict] = {}
@@ -332,111 +382,169 @@ class WebUIManager:
         else:
             raise RuntimeError(f"Templates directory not found: {web_templates_path}")
 
-    def create_session(self, project_directory: str, summary: str) -> str:
-        """創建新的回饋會話 - 重構為單一活躍會話模式，保留標籤頁狀態"""
-        # 保存舊會話的引用和 WebSocket 連接
+    @property
+    def current_session(self) -> WebFeedbackSession | None:
+        """前端目前顯示的活躍會話（相容介面，內部實際指向 _active_session_id）。"""
+        if self._active_session_id is None:
+            return None
+        return self.sessions.get(self._active_session_id)
+
+    @current_session.setter
+    def current_session(self, session: WebFeedbackSession | None) -> None:
+        """設置活躍會話指針。傳入 None 則清空指針（不影響會話字典中的其他會話）。"""
+        if session is None:
+            self._active_session_id = None
+        else:
+            # 確保會話在字典中
+            self.sessions[session.session_id] = session
+            self._active_session_id = session.session_id
+
+    def create_session(
+        self,
+        project_directory: str,
+        summary: str,
+        title: str | None = None,
+    ) -> str:
+        """創建新的回饋會話 - 多會話模式：純插入，不銷毀舊會話。
+
+        階段 1 行為：
+        - 新會話建立並加入 ``self.sessions`` 字典；
+        - ``_active_session_id`` 指向新會話（前端視覺上「切」到新會話）；
+        - 舊活躍會話保持原狀態（WAITING / ACTIVE / FEEDBACK_SUBMITTED 等），
+          其 ``wait_for_feedback`` 仍在阻塞，可被使用者手動歸檔（archive）或
+          正常走完流程，亦可被後續的超時/過期機制清理；
+        - 舊活躍會話若持有 WebSocket，將其轉移給新會話（保持前端單視圖平滑切換）。
+        """
+        # 保存舊活躍會話的 WebSocket 引用，用於轉移
         old_session = self.current_session
         old_websocket = None
         if old_session and old_session.websocket:
             old_websocket = old_session.websocket
-            debug_log("保存舊會話的 WebSocket 連接以發送更新通知")
+            debug_log("保存舊會話的 WebSocket 連接以轉移到新會話")
 
         # 創建新會話
         session_id = str(uuid.uuid4())
-        session = WebFeedbackSession(session_id, project_directory, summary)
+        session = WebFeedbackSession(
+            session_id, project_directory, summary, title=title
+        )
 
-        # 如果有舊會話，處理狀態轉換和清理
-        if old_session:
-            debug_log(
-                f"處理舊會話 {old_session.session_id} 的狀態轉換，當前狀態: {old_session.status.value}"
-            )
-
-            # 保存標籤頁狀態到全局
-            if hasattr(old_session, "active_tabs"):
-                self._merge_tabs_to_global(old_session.active_tabs)
-
-            # 如果舊會話是已提交狀態，進入下一步（已完成）
-            if old_session.status == SessionStatus.FEEDBACK_SUBMITTED:
-                debug_log(
-                    f"舊會話 {old_session.session_id} 進入下一步：已提交 → 已完成"
-                )
-                success = old_session.next_step("反饋已處理，會話完成")
-                if success:
-                    debug_log(f"✅ 舊會話 {old_session.session_id} 成功進入已完成狀態")
-                else:
-                    debug_log(f"❌ 舊會話 {old_session.session_id} 無法進入下一步")
-            else:
-                debug_log(
-                    f"舊會話 {old_session.session_id} 狀態為 {old_session.status.value}，無需轉換"
-                )
-
-            # 確保舊會話仍在字典中（用於API獲取）
-            if old_session.session_id in self.sessions:
-                debug_log(f"舊會話 {old_session.session_id} 仍在會話字典中")
-            else:
-                debug_log(f"⚠️ 舊會話 {old_session.session_id} 不在會話字典中，重新添加")
-                self.sessions[old_session.session_id] = old_session
-
-            # 同步清理會話資源（但保留 WebSocket 連接）
-            old_session._cleanup_sync()
+        # 舊會話標籤頁狀態合入全局（保留此機制以便後續前端全域感知）
+        if old_session and hasattr(old_session, "active_tabs"):
+            self._merge_tabs_to_global(old_session.active_tabs)
 
         # 將全局標籤頁狀態繼承到新會話
         session.active_tabs = self.global_active_tabs.copy()
 
-        # 設置為當前活躍會話
-        self.current_session = session
-        # 同時保存到字典中以保持向後兼容
+        # 加入會話字典並設為活躍
         self.sessions[session_id] = session
+        self._active_session_id = session_id
 
-        debug_log(f"創建新的活躍會話: {session_id}")
+        debug_log(
+            f"創建新會話: {session_id}（目前活躍會話總數: "
+            f"{sum(1 for s in self.sessions.values() if s.is_active())}，"
+            f"字典中總會話數: {len(self.sessions)}）"
+        )
         debug_log(f"繼承 {len(session.active_tabs)} 個活躍標籤頁")
 
-        # 處理WebSocket連接轉移
+        # WebSocket 轉移（相容前端單視圖行為）
         if old_websocket:
-            # 直接轉移連接到新會話，消息發送由 smart_open_browser 統一處理
+            # 舊會話不再持有該 WebSocket（避免兩個會話同時往同一個 socket 寫）
+            if old_session is not None:
+                old_session.websocket = None
             session.websocket = old_websocket
             debug_log("已將舊 WebSocket 連接轉移到新會話")
         else:
-            # 沒有舊連接，標記需要發送會話更新通知（當新 WebSocket 連接建立時）
+            # 無舊連接：標記待發送 session_updated 通知（由 /ws 或 smart_open_browser 消費）
             self._pending_session_update = True
             debug_log("沒有舊 WebSocket 連接，設置待更新標記")
 
         return session_id
 
     def get_session(self, session_id: str) -> WebFeedbackSession | None:
-        """獲取回饋會話 - 保持向後兼容"""
+        """依 id 獲取會話（任意狀態）。"""
         return self.sessions.get(session_id)
 
     def get_current_session(self) -> WebFeedbackSession | None:
-        """獲取當前活躍會話"""
+        """獲取當前活躍（前端顯示中）的會話。"""
         return self.current_session
 
-    def remove_session(self, session_id: str):
-        """移除回饋會話"""
+    def remove_session(self, session_id: str) -> None:
+        """從字典中移除會話並清理其資源。若是活躍會話，指針同步清空。"""
         if session_id in self.sessions:
             session = self.sessions[session_id]
             session.cleanup()
             del self.sessions[session_id]
 
-            # 如果移除的是當前活躍會話，清空當前會話
-            if self.current_session and self.current_session.session_id == session_id:
-                self.current_session = None
-                debug_log("清空當前活躍會話")
+            if self._active_session_id == session_id:
+                self._active_session_id = None
+                debug_log("活躍會話指針已清空")
 
             debug_log(f"移除回饋會話: {session_id}")
 
-    def clear_current_session(self):
-        """清空當前活躍會話"""
-        if self.current_session:
-            session_id = self.current_session.session_id
-            self.current_session.cleanup()
-            self.current_session = None
+    def clear_current_session(self) -> None:
+        """清理並移除當前活躍會話（其他會話不受影響）。"""
+        if self._active_session_id is None:
+            return
+        session_id = self._active_session_id
+        session = self.sessions.get(session_id)
+        if session is not None:
+            session.cleanup()
+            self.sessions.pop(session_id, None)
+        self._active_session_id = None
+        debug_log(f"已清空當前活躍會話: {session_id}")
 
-            # 同時從字典中移除
-            if session_id in self.sessions:
-                del self.sessions[session_id]
+    def cancel_session(
+        self,
+        session_id: str,
+        message: str = "使用者已手動歸檔此會話",
+    ) -> bool:
+        """用戶主動歸檔（取消）指定會話。
 
-            debug_log("已清空當前活躍會話")
+        - 若會話仍在 WAITING / ACTIVE，呼叫 ``session.cancel()`` 讓阻塞中的
+          ``wait_for_feedback`` 解鎖並返回空結果，對應的 MCP tool 呼叫會得到
+          「用戶取消了反饋」的返回；
+        - 若會話已在終態或 FEEDBACK_SUBMITTED，僅視作 UI 層歸檔，不做狀態變動；
+        - 如歸檔的是目前活躍會話，活躍指針自動讓出（指向字典中最新的非終態會話
+          或 None）。
+
+        Returns:
+            bool: True 表示會話存在且被處理；False 表示會話不存在。
+        """
+        session = self.sessions.get(session_id)
+        if session is None:
+            debug_log(f"歸檔失敗：找不到會話 {session_id}")
+            return False
+
+        if session.is_active():
+            session.cancel(message)
+        else:
+            debug_log(
+                f"歸檔會話 {session_id}（當前狀態 {session.status.value}，僅 UI 層標記）"
+            )
+
+        # 如果歸檔的是活躍會話，嘗試把活躍指針轉給另一個非終態會話
+        if self._active_session_id == session_id:
+            fallback_id = self._select_fallback_active_session(exclude_id=session_id)
+            self._active_session_id = fallback_id
+            debug_log(
+                f"活躍會話讓出，新的活躍會話: {fallback_id if fallback_id else '無'}"
+            )
+
+        return True
+
+    def _select_fallback_active_session(
+        self, exclude_id: str | None = None
+    ) -> str | None:
+        """挑選一個備用活躍會話：字典中最新創建、非終態、不等於 exclude_id。"""
+        candidates = [
+            s
+            for s in self.sessions.values()
+            if s.session_id != exclude_id and not s.is_terminal()
+        ]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda s: s.created_at, reverse=True)
+        return candidates[0].session_id
 
     def _merge_tabs_to_global(self, session_tabs: dict):
         """將會話的標籤頁狀態合併到全局狀態"""
@@ -1102,8 +1210,23 @@ def get_web_ui_manager() -> WebUIManager:
     return _web_ui_manager
 
 
+def set_web_ui_manager(manager: WebUIManager) -> None:
+    """注入/覆寫全域 WebUIManager 實例。
+
+    Daemon 啟動時使用：把帶有 ``is_daemon=True`` + MCP lifespan 的 manager
+    注入為全域，確保後續 ``interactive_feedback`` tool 呼叫時
+    ``launch_web_feedback_ui → get_web_ui_manager`` 命中的是同一個實例，
+    否則會發生「daemon 起了一個、tool 調用又另起一個」的分裂。
+    """
+    global _web_ui_manager
+    _web_ui_manager = manager
+
+
 async def launch_web_feedback_ui(
-    project_directory: str, summary: str, timeout: int = 600
+    project_directory: str,
+    summary: str,
+    timeout: int = 600,
+    title: str | None = None,
 ) -> dict:
     """
     啟動 Web 回饋介面並等待用戶回饋 - 重構為使用根路徑
@@ -1112,42 +1235,57 @@ async def launch_web_feedback_ui(
         project_directory: 專案目錄路徑
         summary: AI 工作摘要
         timeout: 超時時間（秒）
+        title: 會話標題（可選），由 AI 傳入用於側欄識別
 
     Returns:
         dict: 回饋結果，包含 logs、interactive_feedback 和 images
     """
     manager = get_web_ui_manager()
 
-    # 創建新會話（每次AI調用都應該創建新會話）
-    manager.create_session(project_directory, summary)
+    # 創建新會話（每次AI調用都創建新會話，多會話並存）
+    manager.create_session(project_directory, summary, title=title)
     session = manager.get_current_session()
 
     if not session:
         raise RuntimeError("無法創建回饋會話")
 
-    # 啟動伺服器（如果尚未啟動）
-    if manager.server_thread is None or not manager.server_thread.is_alive():
-        manager.start_server()
-
-    # 檢查是否為桌面模式
-    desktop_mode = os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true"
-
-    # 使用根路徑 URL
-    feedback_url = manager.get_server_url()  # 直接使用根路徑
-
-    if desktop_mode:
-        # 桌面模式：啟動桌面應用程式
-        debug_log("檢測到桌面模式，啟動桌面應用程式...")
-        has_active_tabs = await manager.launch_desktop_app(feedback_url)
+    # Daemon 模式：外層由 mcp_feedback_enhanced.daemon 管理 uvicorn，
+    # 此處僅創建會話、通知既有標籤頁，不再自啟伺服器或打開新瀏覽器視窗。
+    if manager.is_daemon:
+        debug_log("Daemon 模式：跳過 start_server/smart_open_browser")
+        has_connected_tab = False
+        try:
+            has_connected_tab = await manager.notify_existing_tab_to_refresh()
+        except Exception as e:  # noqa: BLE001 - 通知失敗不影響等待
+            debug_log(f"Daemon 模式通知既有標籤頁失敗（可略）：{e}")
+        if not has_connected_tab:
+            debug_log(
+                f"Daemon 模式：目前無活躍標籤頁，用戶可手動訪問 {manager.get_server_url()}"
+            )
     else:
-        # Web 模式：智能開啟瀏覽器
-        has_active_tabs = await manager.smart_open_browser(feedback_url)
+        # 啟動伺服器（如果尚未啟動）
+        if manager.server_thread is None or not manager.server_thread.is_alive():
+            manager.start_server()
 
-    debug_log(f"[DEBUG] 服務器地址: {feedback_url}")
+        # 檢查是否為桌面模式
+        desktop_mode = os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true"
 
-    # 如果檢測到活躍標籤頁，消息已在 smart_open_browser 中發送，無需額外處理
-    if has_active_tabs:
-        debug_log("檢測到活躍標籤頁，會話更新通知已發送")
+        # 使用根路徑 URL
+        feedback_url = manager.get_server_url()  # 直接使用根路徑
+
+        if desktop_mode:
+            # 桌面模式：啟動桌面應用程式
+            debug_log("檢測到桌面模式，啟動桌面應用程式...")
+            has_active_tabs = await manager.launch_desktop_app(feedback_url)
+        else:
+            # Web 模式：智能開啟瀏覽器
+            has_active_tabs = await manager.smart_open_browser(feedback_url)
+
+        debug_log(f"[DEBUG] 服務器地址: {feedback_url}")
+
+        # 如果檢測到活躍標籤頁，消息已在 smart_open_browser 中發送，無需額外處理
+        if has_active_tabs:
+            debug_log("檢測到活躍標籤頁，會話更新通知已發送")
 
     try:
         # 等待用戶回饋，傳遞 timeout 參數

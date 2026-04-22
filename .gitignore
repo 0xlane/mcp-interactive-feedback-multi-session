@@ -49,8 +49,8 @@ uv.lock
 .mcp_feedback_settings.json
 test_reports/
 
-# Temporary test files
-test_*.py
+# Temporary test files (只忽略專案根目錄下的散落 test 腳本，不影響 tests/ 目錄)
+/test_*.py
 
 # User configuration files
 ui_settings.json

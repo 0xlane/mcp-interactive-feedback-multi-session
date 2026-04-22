@@ -170,6 +170,11 @@ class WebUIManager:
         # _active_session_id：前端目前顯示的會話 id（由 current_session property 存取）
         self._active_session_id: str | None = None
 
+        # 階段 3：多路復用 WebSocket 連接註冊表
+        # 一個瀏覽器 Tab 一條 /ws 連接，會話事件通過 session_id 路由（由前端按 id 分派）。
+        # 使用 set 避免重複註冊；連接斷開時從集合移除。
+        self.connections: set[Any] = set()
+
         # 全局標籤頁狀態管理 - 跨會話保持
         self.global_active_tabs: dict[str, dict] = {}
 
@@ -581,16 +586,114 @@ class WebUIManager:
         return len(valid_tabs)
 
     async def broadcast_to_active_tabs(self, message: dict):
-        """向所有活躍標籤頁廣播消息"""
-        if not self.current_session or not self.current_session.websocket:
-            debug_log("沒有活躍的 WebSocket 連接，無法廣播消息")
-            return
+        """向所有活躍標籤頁廣播消息（階段 3：從單會話 websocket 改為多路復用連接集）。
 
-        try:
-            await self.current_session.websocket.send_json(message)
-            debug_log(f"已廣播消息到活躍標籤頁: {message.get('type', 'unknown')}")
-        except Exception as e:
-            debug_log(f"廣播消息失敗: {e}")
+        歷史上該方法只向 ``current_session.websocket`` 發送；多會話模式下所有連接
+        都屬於「全局 Tab」，應該都收到。保留方法名以維持外部呼叫相容，內部走
+        :meth:`broadcast`。
+        """
+        await self.broadcast(message)
+
+    def register_connection(self, websocket: Any) -> None:
+        """登記一條新的瀏覽器 WebSocket 連接（多路復用模式）。
+
+        ``/ws`` 端點在 ``websocket.accept()`` 之後調用。同一個 websocket 重複
+        登記會被 set 自動去重。
+        """
+        self.connections.add(websocket)
+        debug_log(
+            f"WebSocket 連接已登記，當前連接數: {len(self.connections)}"
+        )
+
+    def unregister_connection(self, websocket: Any) -> None:
+        """移除一條已斷開的瀏覽器 WebSocket 連接。
+
+        同時清理 ``session.websocket`` 中可能還殘留的引用，避免會話事件繼續
+        往死連接寫導致異常堆疊。
+        """
+        self.connections.discard(websocket)
+        for session in self.sessions.values():
+            if getattr(session, "websocket", None) is websocket:
+                session.websocket = None
+        debug_log(
+            f"WebSocket 連接已移除，當前連接數: {len(self.connections)}"
+        )
+
+    async def broadcast(self, event: dict) -> int:
+        """向所有已連接的瀏覽器 Tab 廣播一個事件。
+
+        - 任一連接發送失敗（多為 Tab 已關閉）會被記為死連接並從 ``self.connections``
+          + 對應 ``session.websocket`` 中剔除；
+        - 返回成功送達的連接數；呼叫方可據此判斷是否需要回退到「打開瀏覽器」。
+        """
+        if not self.connections:
+            return 0
+
+        delivered = 0
+        dead: list[Any] = []
+        for ws in list(self.connections):
+            try:
+                await ws.send_json(event)
+                delivered += 1
+            except Exception as e:  # noqa: BLE001 - 單連接失敗不影響其他
+                debug_log(
+                    f"向 WebSocket {ws!r} 廣播 {event.get('type', '?')} 失敗，標記為死連接: {e}"
+                )
+                dead.append(ws)
+
+        for ws in dead:
+            self.unregister_connection(ws)
+
+        return delivered
+
+    def build_sessions_snapshot(self) -> list[dict]:
+        """構建所有會話的全量快照，供 ``sessions_snapshot`` 事件或 ``/api/sessions`` 使用。
+
+        字段與 ``/api/all-sessions`` 對齊，按創建時間降序。
+        """
+        snapshot: list[dict] = []
+        for session_id, session in self.sessions.items():
+            snapshot.append(
+                {
+                    "session_id": session.session_id,
+                    "project_directory": session.project_directory,
+                    "summary": session.summary,
+                    "title": session.title,
+                    "status": session.status.value,
+                    "status_message": session.status_message,
+                    "created_at": int(session.created_at * 1000),
+                    "last_activity": int(session.last_activity * 1000),
+                    "feedback_completed": session.feedback_completed.is_set(),
+                    "is_current": session_id == self._active_session_id,
+                    "user_messages": session.user_messages,
+                }
+            )
+        snapshot.sort(key=lambda x: x["created_at"], reverse=True)
+        return snapshot
+
+    async def broadcast_session_event(
+        self, event_type: str, session_id: str, **extra: Any
+    ) -> int:
+        """以 ``session_id`` 為主鍵廣播一條會話相關事件的便捷方法。
+
+        自動補 ``session_id`` 和 ``type``；若該 ``session_id`` 仍在 ``self.sessions``
+        中且調用方未傳 ``status``/``title`` 等字段，會自動附帶當前最新狀態，便於
+        前端直接更新側欄卡片。
+        """
+        payload: dict[str, Any] = {
+            "type": event_type,
+            "session_id": session_id,
+            **extra,
+        }
+        session = self.sessions.get(session_id)
+        if session is not None:
+            payload.setdefault("status", session.status.value)
+            payload.setdefault("status_message", session.status_message)
+            payload.setdefault("title", session.title)
+            payload.setdefault(
+                "last_activity", int(session.last_activity * 1000)
+            )
+        return await self.broadcast(payload)
 
     def start_server(self):
         """啟動 Web 伺服器（優化版本，支援並行初始化）"""
@@ -1243,11 +1346,37 @@ async def launch_web_feedback_ui(
     manager = get_web_ui_manager()
 
     # 創建新會話（每次AI調用都創建新會話，多會話並存）
-    manager.create_session(project_directory, summary, title=title)
+    session_id = manager.create_session(project_directory, summary, title=title)
     session = manager.get_current_session()
 
     if not session:
         raise RuntimeError("無法創建回饋會話")
+
+    # 階段 3：向所有已連接的瀏覽器 Tab 廣播「新會話建立」事件，讓側欄即時
+    # 插入新卡片 + 提醒用戶。若當前無連接（用戶還沒開瀏覽器），廣播會無聲
+    # 返回，後續靠 smart_open_browser 開新窗 + 連接建立時的 sessions_snapshot
+    # 補上全量。
+    try:
+        await manager.broadcast(
+            {
+                "type": "session_created",
+                "session": {
+                    "session_id": session.session_id,
+                    "project_directory": session.project_directory,
+                    "summary": session.summary,
+                    "title": session.title,
+                    "status": session.status.value,
+                    "status_message": session.status_message,
+                    "created_at": int(session.created_at * 1000),
+                    "last_activity": int(session.last_activity * 1000),
+                    "feedback_completed": False,
+                    "is_current": True,
+                    "user_messages": [],
+                },
+            }
+        )
+    except Exception as e:  # noqa: BLE001
+        debug_log(f"廣播 session_created 失敗（不影響會話等待）: {e}")
 
     # Daemon 模式：外層由 mcp_feedback_enhanced.daemon 管理 uvicorn，
     # 此處僅創建會話、通知既有標籤頁，不再自啟伺服器或打開新瀏覽器視窗。

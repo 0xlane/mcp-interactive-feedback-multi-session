@@ -573,6 +573,38 @@ class WebFeedbackSession:
             await self._cleanup_resources_on_timeout()
             raise
 
+    async def _broadcast_event(self, event: dict[str, Any]) -> None:
+        """向所有已連接的瀏覽器 Tab 廣播本會話的事件（階段 3：多路復用）。
+
+        自動補上 ``session_id``，使前端可以按 id 分派事件。若全局 ``WebUIManager``
+        尚未就緒或廣播失敗，回退到原來的 ``self.websocket.send_json``（單連接模式），
+        保證即使 manager 廣播通道暫時不可用，舊模式下也能繼續送達。
+        """
+        event.setdefault("session_id", self.session_id)
+
+        manager = None
+        try:
+            from ..main import get_web_ui_manager
+
+            manager = get_web_ui_manager()
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"獲取 WebUIManager 失敗（回退到單 WS 發送）: {e}")
+            manager = None
+
+        if manager is not None and getattr(manager, "connections", None):
+            try:
+                await manager.broadcast(event)
+                return
+            except Exception as e:  # noqa: BLE001
+                debug_log(f"manager.broadcast 失敗（回退到單 WS 發送）: {e}")
+
+        ws = self.websocket
+        if ws is not None:
+            try:
+                await ws.send_json(event)
+            except Exception as e:  # noqa: BLE001
+                debug_log(f"單 WS 發送失敗: {e}")
+
     async def submit_feedback(
         self,
         feedback: str,
@@ -602,36 +634,45 @@ class WebFeedbackSession:
 
         self.feedback_completed.set()
 
-        # 發送反饋已收到的消息給前端
-        if self.websocket:
+        # 廣播：反饋已收到（階段 3 新增獨立事件 + 舊版 notification 兼容）
+        try:
+            await self._broadcast_event(
+                {
+                    "type": "session_feedback_submitted",
+                    "status": self.status.value,
+                    "status_message": self.status_message,
+                    "title": self.title,
+                    "last_activity": int(self.last_activity * 1000),
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"廣播 session_feedback_submitted 失敗: {e}")
+
+        try:
+            await self._broadcast_event(
+                {
+                    "type": "notification",
+                    "code": self.get_message_code("FEEDBACK_SUBMITTED"),
+                    "severity": "success",
+                    "status": self.status.value,
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"廣播 notification(FEEDBACK_SUBMITTED) 失敗: {e}")
+
+        # 桌面模式：反饋提交後立即關閉桌面應用程式（功能保留，後續階段 5 再決定是否廢棄）
+        import os
+
+        if os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true":
+            debug_log("桌面模式：反饋提交後立即關閉桌面應用程式")
             try:
-                await self.websocket.send_json(
-                    {
-                        "type": "notification",
-                        "code": self.get_message_code("FEEDBACK_SUBMITTED"),
-                        "severity": "success",
-                        "status": self.status.value,
-                    }
-                )
+                from ..main import get_web_ui_manager
 
-                # 檢查是否為桌面模式，如果是則立即關閉桌面應用程式
-                import os
-
-                if os.environ.get("MCP_DESKTOP_MODE", "").lower() == "true":
-                    debug_log("桌面模式：反饋提交後立即關閉桌面應用程式")
-
-                    # 立即關閉桌面應用程式，無延遲
-                    try:
-                        from ..main import get_web_ui_manager
-
-                        manager = get_web_ui_manager()
-                        manager.close_desktop_app()
-                        debug_log("桌面應用程式立即關閉成功")
-                    except Exception as close_error:
-                        debug_log(f"立即關閉桌面應用程式失敗: {close_error}")
-
-            except Exception as e:
-                debug_log(f"發送反饋確認失敗: {e}")
+                manager = get_web_ui_manager()
+                manager.close_desktop_app()
+                debug_log("桌面應用程式立即關閉成功")
+            except Exception as close_error:  # noqa: BLE001
+                debug_log(f"立即關閉桌面應用程式失敗: {close_error}")
 
         # 重構：不再自動關閉 WebSocket，保持連接以支援頁面持久性
 
@@ -739,10 +780,9 @@ class WebFeedbackSession:
             except ValueError as e:
                 error_msg = f"命令安全檢查失敗: {e}"
                 debug_log(error_msg)
-                if self.websocket:
-                    await self.websocket.send_json(
-                        {"type": "command_error", "error": error_msg}
-                    )
+                await self._broadcast_event(
+                    {"type": "command_error", "error": error_msg}
+                )
                 return
 
             # 使用安全的方式執行命令（不使用 shell=True）
@@ -780,14 +820,12 @@ class WebFeedbackSession:
                             break
 
                         self.add_log(line.rstrip())
-                        if self.websocket:
-                            try:
-                                await self.websocket.send_json(
-                                    {"type": "command_output", "output": line}
-                                )
-                            except Exception as e:
-                                debug_log(f"WebSocket 發送失敗: {e}")
-                                break
+                        try:
+                            await self._broadcast_event(
+                                {"type": "command_output", "output": line}
+                            )
+                        except Exception as e:  # noqa: BLE001
+                            debug_log(f"廣播 command_output 失敗: {e}")
 
                 except Exception as e:
                     debug_log(f"讀取命令輸出錯誤: {e}")
@@ -799,27 +837,28 @@ class WebFeedbackSession:
                         # 從資源管理器取消註冊進程
                         self.resource_manager.unregister_process(self.process.pid)
 
-                        # 發送命令完成信號
-                        if self.websocket:
-                            try:
-                                await self.websocket.send_json(
-                                    {"type": "command_complete", "exit_code": exit_code}
-                                )
-                            except Exception as e:
-                                debug_log(f"發送完成信號失敗: {e}")
+                        # 廣播命令完成信號（多路復用：帶 session_id）
+                        try:
+                            await self._broadcast_event(
+                                {
+                                    "type": "command_complete",
+                                    "exit_code": exit_code,
+                                }
+                            )
+                        except Exception as e:  # noqa: BLE001
+                            debug_log(f"廣播 command_complete 失敗: {e}")
 
             # 啟動異步任務讀取輸出
             asyncio.create_task(read_output())
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             debug_log(f"執行命令錯誤: {e}")
-            if self.websocket:
-                try:
-                    await self.websocket.send_json(
-                        {"type": "command_error", "error": str(e)}
-                    )
-                except:
-                    pass
+            try:
+                await self._broadcast_event(
+                    {"type": "command_error", "error": str(e)}
+                )
+            except Exception as broadcast_err:  # noqa: BLE001
+                debug_log(f"廣播 command_error 失敗: {broadcast_err}")
 
     async def _cleanup_resources_on_timeout(self):
         """超時時清理所有資源（保持向後兼容）"""
@@ -865,39 +904,43 @@ class WebFeedbackSession:
                 self.user_timeout_timer = None
                 resources_cleaned += 1
 
-            # 2. 關閉 WebSocket 連接
-            if self.websocket:
-                try:
-                    # 根據清理原因獲取訊息代碼
-                    code_key_map = {
-                        CleanupReason.TIMEOUT: "TIMEOUT_CLEANUP",
-                        CleanupReason.EXPIRED: "EXPIRED_CLEANUP",
-                        CleanupReason.MEMORY_PRESSURE: "MEMORY_PRESSURE_CLEANUP",
-                        CleanupReason.MANUAL: "MANUAL_CLEANUP",
-                        CleanupReason.ERROR: "ERROR_CLEANUP",
-                        CleanupReason.SHUTDOWN: "SHUTDOWN_CLEANUP",
+            # 2. 廣播會話清理事件（階段 3：多路復用，不再主動關閉瀏覽器 WS）
+            #    多會話模式下，同一個 WS 為所有會話服務，關掉會誤傷其他會話。
+            #    僅發送 notification 讓前端把該會話卡片切換到「已清理」樣式。
+            try:
+                code_key_map = {
+                    CleanupReason.TIMEOUT: "TIMEOUT_CLEANUP",
+                    CleanupReason.EXPIRED: "EXPIRED_CLEANUP",
+                    CleanupReason.MEMORY_PRESSURE: "MEMORY_PRESSURE_CLEANUP",
+                    CleanupReason.MANUAL: "MANUAL_CLEANUP",
+                    CleanupReason.ERROR: "ERROR_CLEANUP",
+                    CleanupReason.SHUTDOWN: "SHUTDOWN_CLEANUP",
+                }
+                code_key = code_key_map.get(reason, "SESSION_CLEANUP")
+
+                await self._broadcast_event(
+                    {
+                        "type": "notification",
+                        "code": self.get_message_code(code_key),
+                        "severity": "warning",
+                        "reason": reason.value,
                     }
-
-                    code_key = code_key_map.get(reason, "SESSION_CLEANUP")
-
-                    await self.websocket.send_json(
-                        {
-                            "type": "notification",
-                            "code": self.get_message_code(code_key),
-                            "severity": "warning",
-                            "reason": reason.value,
-                        }
-                    )
-                    await asyncio.sleep(0.1)  # 給前端一點時間處理消息
-
-                    # 安全關閉 WebSocket
-                    await self._safe_close_websocket()
-                    debug_log(f"會話 {self.session_id} WebSocket 已關閉")
-                    resources_cleaned += 1
-                except Exception as e:
-                    debug_log(f"關閉 WebSocket 時發生錯誤: {e}")
-                finally:
-                    self.websocket = None
+                )
+                # 同時推一個統一的 session_expired 事件，便於前端直接更新側欄卡片
+                await self._broadcast_event(
+                    {
+                        "type": "session_expired",
+                        "reason": reason.value,
+                        "status": self.status.value,
+                    }
+                )
+                await asyncio.sleep(0.05)  # 給前端一點時間處理消息
+                resources_cleaned += 1
+            except Exception as e:  # noqa: BLE001
+                debug_log(f"廣播清理通知時發生錯誤: {e}")
+            finally:
+                # 解除對此 WS 的引用（但不關閉，因為它可能在為其他會話服務）
+                self.websocket = None
 
             # 3. 終止正在運行的命令進程
             if self.process:

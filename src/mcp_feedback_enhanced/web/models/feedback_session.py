@@ -241,8 +241,10 @@ class WebFeedbackSession:
 
         self.last_activity = time.time()
 
-        # 如果會話變為已提交狀態，重置清理定時器
-        if next_status == SessionStatus.FEEDBACK_SUBMITTED:
+        # 非終態狀態流轉視為「用戶活躍」，重置自動清理定時器；
+        # 終態（COMPLETED / ERROR / TIMEOUT / EXPIRED / CANCELED）不再續命，
+        # 等待既有終態清理路徑收尾。
+        if not self.is_terminal():
             self._schedule_auto_cleanup()
 
         debug_log(
@@ -590,7 +592,12 @@ class WebFeedbackSession:
         self.settings = settings or {}
         self.images = self._process_images(images)
 
-        # 進入下一步：等待中 → 已提交反饋
+        # next_step 一次只能前進一階；直接從 WAITING 調用會落在 ACTIVE 而非
+        # FEEDBACK_SUBMITTED，因此若當前還在 WAITING 必須先補一次流轉
+        # （WAITING → ACTIVE → FEEDBACK_SUBMITTED），保持語義：呼叫
+        # submit_feedback 後狀態一定是「已提交」。
+        if self.status == SessionStatus.WAITING:
+            self.next_step("會話已啟動")
         self.next_step("已送出反饋，等待下次 MCP 調用")
 
         self.feedback_completed.set()

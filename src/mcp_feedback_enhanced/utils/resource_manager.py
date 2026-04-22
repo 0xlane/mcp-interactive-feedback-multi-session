@@ -442,6 +442,7 @@ class ResourceManager:
         """
         cleaned_count = 0
         processes_to_remove = []
+        self_pid = os.getpid()
 
         for pid, process_info in self.processes.copy().items():
             try:
@@ -449,6 +450,15 @@ class ResourceManager:
                 auto_cleanup = process_info.get("auto_cleanup", True)
 
                 if not auto_cleanup:
+                    continue
+
+                # 絕不對自己開刀：若某處不小心把當前進程的 PID 註冊到
+                # ResourceManager（例如舊測試 `rm.register_process(os.getpid())`），
+                # 這個循環在 atexit 觸發時會呼叫 `psutil.Process.terminate()` 送
+                # SIGTERM 給自己，導致 pytest 以 exit 143 退出。
+                if process_obj is None and pid == self_pid:
+                    debug_log(f"跳過清理自身 PID {pid}，避免自殺式終止")
+                    processes_to_remove.append(pid)
                     continue
 
                 # 檢查進程是否還在運行

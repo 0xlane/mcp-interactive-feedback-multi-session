@@ -424,4 +424,4 @@
 
 ---
 
-**完整專案資訊：** [GitHub - mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)
+**完整專案資訊：** [GitHub - mcp-feedback-enhanced](https://github.com/0xlane/mcp-interactive-feedback-multi-session)

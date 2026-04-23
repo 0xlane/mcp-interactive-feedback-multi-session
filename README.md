@@ -2,9 +2,8 @@
 
 **🌐 Language / 語言切換:** **English** | [繁體中文](README.zh-TW.md) | [简体中文](README.zh-CN.md)
 
-**Original Author:** [Fábio Ferreira](https://x.com/fabiomlferreira) | [Original Project](https://github.com/noopstudios/interactive-feedback-mcp) ⭐
-**Enhanced Fork:** [Minidoracat](https://github.com/Minidoracat)
-**UI Design Reference:** [sanshao85/mcp-feedback-collector](https://github.com/sanshao85/mcp-feedback-collector)
+> Based on **mcp-feedback-enhanced** by Minidoracat, originally forked from **interactive-feedback-mcp** by Fábio Ferreira.
+> UI design inspired by **mcp-feedback-collector** by sanshao85.
 
 ## 🎯 Core Concept
 
@@ -212,8 +211,8 @@ MCP_LANGUAGE=zh-CN uvx mcp-feedback-enhanced@latest test --web  # Force Simplifi
 
 ### Developer Installation
 ```bash
-git clone https://github.com/Minidoracat/mcp-feedback-enhanced.git
-cd mcp-feedback-enhanced
+git clone https://github.com/0xlane/mcp-interactive-feedback-multi-session.git
+cd mcp-interactive-feedback-multi-session
 uv sync
 ```
 
@@ -376,33 +375,15 @@ A: Various AI models (including Gemini Pro 2.5, Claude, etc.) may have instabili
 
 ## 🙏 Acknowledgments
 
-### 🌟 Support Original Author
-**Fábio Ferreira** - [X @fabiomlferreira](https://x.com/fabiomlferreira)
-**Original Project:** [noopstudios/interactive-feedback-mcp](https://github.com/noopstudios/interactive-feedback-mcp)
+This project stands on the shoulders of giants. Credits go to the original author and everyone who contributed upstream:
 
-If you find it useful, please:
-- ⭐ [Star the original project](https://github.com/noopstudios/interactive-feedback-mcp)
-- 📱 [Follow the original author](https://x.com/fabiomlferreira)
-
-### Design Inspiration
-**sanshao85** - [mcp-feedback-collector](https://github.com/sanshao85/mcp-feedback-collector)
-
-### Contributors
-**penn201500** - [GitHub @penn201500](https://github.com/penn201500)
-- 🎯 Auto-focus input box feature ([PR #39](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/39))
-
-**leo108** - [GitHub @leo108](https://github.com/leo108)
-- 🌐 SSH Remote Development Support (`MCP_WEB_HOST` environment variable) ([PR #113](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/113))
-
-**Alsan** - [GitHub @Alsan](https://github.com/Alsan)
-- 🍎 macOS PyO3 Compilation Configuration Support ([PR #93](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/93))
-
-**fireinice** - [GitHub @fireinice](https://github.com/fireinice)
-- 📝 Tool Documentation Optimization (LLM instructions moved to docstring) ([PR #105](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/105))
+- **Fábio Ferreira** — author of the original **interactive-feedback-mcp**
+- **Minidoracat** — author of **mcp-feedback-enhanced**, the direct upstream of this fork
+- **sanshao85** — UI design inspiration from **mcp-feedback-collector**
+- Upstream contributors: **penn201500**, **leo108**, **Alsan**, **fireinice**
 
 ### Community Support
-- **Discord:** [https://discord.gg/Gur2V67](https://discord.gg/Gur2V67)
-- **Issues:** [GitHub Issues](https://github.com/Minidoracat/mcp-feedback-enhanced/issues)
+- **Issues:** [GitHub Issues](https://github.com/0xlane/mcp-interactive-feedback-multi-session/issues)
 
 ## 📄 License
 
@@ -410,7 +391,7 @@ MIT License - See [LICENSE](LICENSE) file for details
 
 ## 📈 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Minidoracat/mcp-feedback-enhanced&type=Date)](https://star-history.com/#Minidoracat/mcp-feedback-enhanced&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=0xlane/mcp-interactive-feedback-multi-session&type=Date)](https://star-history.com/#0xlane/mcp-interactive-feedback-multi-session&Date)
 
 ---
 **🌟 Welcome to Star and share with more developers!**

@@ -2,9 +2,8 @@
 
 **🌐 语言切换 / Language:** [English](README.md) | [繁體中文](README.zh-TW.md) | **简体中文**
 
-**原作者：** [Fábio Ferreira](https://x.com/fabiomlferreira) | [原始项目](https://github.com/noopstudios/interactive-feedback-mcp) ⭐
-**分支版本：** [Minidoracat](https://github.com/Minidoracat)
-**UI 设计参考：** [sanshao85/mcp-feedback-collector](https://github.com/sanshao85/mcp-feedback-collector)
+> 本项目基于 Minidoracat 的 **mcp-feedback-enhanced**，其最初 fork 自 Fábio Ferreira 的 **interactive-feedback-mcp**。
+> UI 设计参考自 sanshao85 的 **mcp-feedback-collector**。
 
 ## 🎯 核心概念
 
@@ -212,8 +211,8 @@ MCP_LANGUAGE=zh-CN uvx mcp-feedback-enhanced@latest test --web  # 强制使用�
 
 ### 开发者安装
 ```bash
-git clone https://github.com/Minidoracat/mcp-feedback-enhanced.git
-cd mcp-feedback-enhanced
+git clone https://github.com/0xlane/mcp-interactive-feedback-multi-session.git
+cd mcp-interactive-feedback-multi-session
 uv sync
 ```
 
@@ -376,33 +375,15 @@ A: 各种 AI 模型（包括 Gemini Pro 2.5、Claude 等）在图片解析上可
 
 ## 🙏 致谢
 
-### 🌟 支持原作者
-**Fábio Ferreira** - [X @fabiomlferreira](https://x.com/fabiomlferreira)
-**原始项目：** [noopstudios/interactive-feedback-mcp](https://github.com/noopstudios/interactive-feedback-mcp)
+本项目站在巨人的肩膀上，感谢原作者以及所有上游贡献者：
 
-如果您觉得有用，请：
-- ⭐ [为原项目按星星](https://github.com/noopstudios/interactive-feedback-mcp)
-- 📱 [关注原作者](https://x.com/fabiomlferreira)
+- **Fábio Ferreira** — 原始项目 **interactive-feedback-mcp** 的作者
+- **Minidoracat** — **mcp-feedback-enhanced** 的作者，也是本 fork 的直接上游
+- **sanshao85** — UI 设计灵感来源 **mcp-feedback-collector**
+- 上游贡献者：**penn201500**、**leo108**、**Alsan**、**fireinice**
 
-### 设计灵感
-**sanshao85** - [mcp-feedback-collector](https://github.com/sanshao85/mcp-feedback-collector)
-
-### 贡献者
-**penn201500** - [GitHub @penn201500](https://github.com/penn201500)
-- 🎯 自动聚焦输入框功能 ([PR #39](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/39))
-
-**leo108** - [GitHub @leo108](https://github.com/leo108)
-- 🌐 SSH 远程开发支持 (`MCP_WEB_HOST` 环境变量) ([PR #113](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/113))
-
-**Alsan** - [GitHub @Alsan](https://github.com/Alsan)
-- 🍎 macOS PyO3 编译配置支持 ([PR #93](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/93))
-
-**fireinice** - [GitHub @fireinice](https://github.com/fireinice)
-- 📝 工具文档优化 (LLM 指令移至 docstring) ([PR #105](https://github.com/Minidoracat/mcp-feedback-enhanced/pull/105))
-
-### 社群支援
-- **Discord：** [https://discord.gg/Gur2V67](https://discord.gg/Gur2V67)
-- **Issues：** [GitHub Issues](https://github.com/Minidoracat/mcp-feedback-enhanced/issues)
+### 社群支持
+- **Issues：** [GitHub Issues](https://github.com/0xlane/mcp-interactive-feedback-multi-session/issues)
 
 ## 📄 授权
 
@@ -410,7 +391,7 @@ MIT 授权条款 - 详见 [LICENSE](LICENSE) 档案
 
 ## 📈 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Minidoracat/mcp-feedback-enhanced&type=Date)](https://star-history.com/#Minidoracat/mcp-feedback-enhanced&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=0xlane/mcp-interactive-feedback-multi-session&type=Date)](https://star-history.com/#0xlane/mcp-interactive-feedback-multi-session&Date)
 
 ---
 **🌟 欢迎 Star 并分享给更多开发者！**

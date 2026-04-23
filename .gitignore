@@ -87,3 +87,7 @@ yarn.lock
 # Temporary build files
 *.tmp
 *.temp
+
+# CI-generated release artifacts
+release_body.md
+highlights.txt

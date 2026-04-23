@@ -44,10 +44,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Littlecowherd/mcp-interactive-feedback"
-Repository = "https://github.com/Littlecowherd/mcp-interactive-feedback"
-Issues = "https://github.com/Littlecowherd/mcp-interactive-feedback/issues"
-Upstream = "https://github.com/Minidoracat/mcp-feedback-enhanced"
+Homepage = "https://github.com/0xlane/mcp-interactive-feedback-multi-session"
+Repository = "https://github.com/0xlane/mcp-interactive-feedback-multi-session"
+Issues = "https://github.com/0xlane/mcp-interactive-feedback-multi-session/issues"
 
 [project.scripts]
 mcp-interactive-feedback = "mcp_feedback_enhanced.__main__:main"

@@ -143,6 +143,6 @@ jobs:
         echo "- [桌面構建工作流程](../../actions/workflows/build-desktop.yml)" >> $GITHUB_STEP_SUMMARY
         echo "- [發佈工作流程](../../actions/workflows/publish.yml)" >> $GITHUB_STEP_SUMMARY
         if [ "${{ needs.release.result }}" = "success" ]; then
-          echo "- [PyPI 頁面](https://pypi.org/project/mcp-feedback-enhanced/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [PyPI 頁面](https://pypi.org/project/mcp-interactive-feedback/)" >> $GITHUB_STEP_SUMMARY
           echo "- [GitHub Releases](../../releases)" >> $GITHUB_STEP_SUMMARY
         fi

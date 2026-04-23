@@ -149,5 +149,5 @@ python scripts/cleanup_cache.py --clean
 
 如果遇到清理問題，請：
 1. 查看本文檔的故障排除部分
-2. 在 [GitHub Issues](https://github.com/Minidoracat/mcp-feedback-enhanced/issues) 回報問題
+2. 在 [GitHub Issues](https://github.com/0xlane/mcp-interactive-feedback-multi-session/issues) 回報問題
 3. 提供錯誤訊息和系統資訊

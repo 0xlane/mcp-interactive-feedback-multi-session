@@ -255,7 +255,7 @@ def process_feedback(data):
 4. 渲染內容
 
 #### 連結和引用
-- 專案連結：[MCP Feedback Enhanced](https://github.com/example/mcp-feedback-enhanced)
+- 專案連結：[MCP Interactive Feedback](https://github.com/0xlane/mcp-interactive-feedback-multi-session)
 - 文檔連結：[Marked.js 官方文檔](https://marked.js.org/)
 
 > **重要提示：** 所有 HTML 輸出都經過 DOMPurify 清理，確保安全性。
@@ -484,7 +484,7 @@ def show_version():
 
     print(f"MCP Feedback Enhanced Enhanced v{__version__}")
     print(f"作者: {__author__}")
-    print("GitHub: https://github.com/Minidoracat/mcp-feedback-enhanced")
+    print("GitHub: https://github.com/0xlane/mcp-interactive-feedback-multi-session")
 
 
 if __name__ == "__main__":

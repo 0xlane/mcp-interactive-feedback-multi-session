@@ -184,13 +184,13 @@ jobs:
         echo "## 🌐 Detailed Release Notes" >> release_body.md
         echo "" >> release_body.md
         echo "### 🇺🇸 English" >> release_body.md
-        echo "📖 **[View Complete English Release Notes](https://github.com/Minidoracat/mcp-feedback-enhanced/blob/main/RELEASE_NOTES/CHANGELOG.en.md)**" >> release_body.md
+        echo "📖 **[View Complete English Release Notes](https://github.com/0xlane/mcp-interactive-feedback-multi-session/blob/main/RELEASE_NOTES/CHANGELOG.en.md)**" >> release_body.md
         echo "" >> release_body.md
         echo "### 🇹🇼 繁體中文" >> release_body.md
-        echo "📖 **[查看完整繁體中文發布說明](https://github.com/Minidoracat/mcp-feedback-enhanced/blob/main/RELEASE_NOTES/CHANGELOG.zh-TW.md)**" >> release_body.md
+        echo "📖 **[查看完整繁體中文發布說明](https://github.com/0xlane/mcp-interactive-feedback-multi-session/blob/main/RELEASE_NOTES/CHANGELOG.zh-TW.md)**" >> release_body.md
         echo "" >> release_body.md
         echo "### 🇨🇳 简体中文" >> release_body.md
-        echo "📖 **[查看完整简体中文发布说明](https://github.com/Minidoracat/mcp-feedback-enhanced/blob/main/RELEASE_NOTES/CHANGELOG.zh-CN.md)**" >> release_body.md
+        echo "📖 **[查看完整简体中文发布说明](https://github.com/0xlane/mcp-interactive-feedback-multi-session/blob/main/RELEASE_NOTES/CHANGELOG.zh-CN.md)**" >> release_body.md
         echo "" >> release_body.md
         echo "---" >> release_body.md
         echo "" >> release_body.md
@@ -205,9 +205,9 @@ jobs:
         echo '```' >> release_body.md
         echo "" >> release_body.md
         echo "## 🔗 Links" >> release_body.md
-        echo "- **Documentation**: [README.md](https://github.com/Minidoracat/mcp-feedback-enhanced/blob/main/README.md)" >> release_body.md
-        echo "- **Full Changelog**: [CHANGELOG](https://github.com/Minidoracat/mcp-feedback-enhanced/blob/main/RELEASE_NOTES/)" >> release_body.md
-        echo "- **Issues**: [GitHub Issues](https://github.com/Minidoracat/mcp-feedback-enhanced/issues)" >> release_body.md
+        echo "- **Documentation**: [README.md](https://github.com/0xlane/mcp-interactive-feedback-multi-session/blob/main/README.md)" >> release_body.md
+        echo "- **Full Changelog**: [CHANGELOG](https://github.com/0xlane/mcp-interactive-feedback-multi-session/blob/main/RELEASE_NOTES/)" >> release_body.md
+        echo "- **Issues**: [GitHub Issues](https://github.com/0xlane/mcp-interactive-feedback-multi-session/issues)" >> release_body.md
         echo "" >> release_body.md
         echo "---" >> release_body.md
         echo "**Release automatically generated from CHANGELOG system** 🤖" >> release_body.md
@@ -490,8 +490,8 @@ jobs:
       run: |
         echo "🎉 Release v${{ steps.bump_version.outputs.new }} completed successfully!"
         echo ""
-        echo "📦 Published to PyPI: https://pypi.org/project/mcp-feedback-enhanced/"
-        echo "🚀 GitHub Release: https://github.com/Minidoracat/mcp-feedback-enhanced/releases/tag/v${{ steps.bump_version.outputs.new }}"
+        echo "📦 Published to PyPI: https://pypi.org/project/mcp-interactive-feedback/"
+        echo "🚀 GitHub Release: https://github.com/0xlane/mcp-interactive-feedback-multi-session/releases/tag/v${{ steps.bump_version.outputs.new }}"
         echo "📝 Release notes generated from CHANGELOG files"
         echo ""
 

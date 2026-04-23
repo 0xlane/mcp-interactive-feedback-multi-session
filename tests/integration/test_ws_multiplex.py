@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Generator
 
 import anyio
@@ -366,3 +367,88 @@ def test_ws_message_routed_by_session_id(mux_manager, test_project_dir):
         SessionStatus.CANCELED,
         SessionStatus.COMPLETED,
     }
+
+
+# --------------------------------------------------------------------------- #
+# 心跳不汙染 last_activity 的回歸測試
+# --------------------------------------------------------------------------- #
+
+
+def test_heartbeat_does_not_bump_last_activity(mux_manager, test_project_dir):
+    """回歸：心跳只撥 ``last_heartbeat``，不應動到 ``last_activity``。
+
+    BUG 現象：早期實作裡心跳同時更新 ``last_activity``，導致側欄卡片上的
+    相對時間（基於 ``last_activity``）被反覆重置成「剛剛」，讓使用者誤以為
+    一直有新操作。修正後心跳只承擔連線存活語義。
+    """
+    sid = mux_manager.create_session(str(test_project_dir), "心跳測試", title="HB")
+    session = mux_manager.sessions[sid]
+    # 把 last_activity 倒回到很早，方便觀察是否被心跳撥新
+    session.last_activity = 1_000_000.0
+    baseline_activity = session.last_activity
+    assert session.last_heartbeat is None
+
+    with TestClient(mux_manager.app) as client:
+        with client.websocket_connect("/ws?lang=zh-TW") as ws:
+            _drain_initial(ws)
+            ws.send_json(
+                {"type": "heartbeat", "session_id": sid, "timestamp": 1234567890}
+            )
+
+            # 後端回 heartbeat_response 即認為處理完畢
+            resp = _wait_for_type(ws, "heartbeat_response")
+            assert resp["timestamp"] == 1234567890
+
+    # 斷言：last_heartbeat 有被撥新；last_activity 保持不變
+    assert session.last_heartbeat is not None
+    assert session.last_heartbeat > 0
+    assert session.last_activity == baseline_activity, (
+        "心跳不應更新 last_activity（這會導致側欄相對時間被反覆重置）"
+    )
+
+
+def test_reconnection_status_update_does_not_change_visible_time(mux_manager, test_project_dir):
+    """回歸：(re)connection 時後端重發的 ``status_update`` 不代表使用者有新操作，
+    前端不能藉此把側欄卡片的時間撥到 "now"。
+
+    這裡只驗證後端傳輸層：``status_update`` payload 不會帶一個「剛剛」的
+    ``last_activity`` 欄位（如果帶，也必須是從會話的真實 ``last_activity``
+    讀出，而不是 ``time.time()`` 這類「發送時間」）。
+    """
+    sid = mux_manager.create_session(str(test_project_dir), "回放測試")
+    session = mux_manager.sessions[sid]
+    # 用一個真實年代的 timestamp，避免和 ms/s 切換的閾值糾纏
+    old_ts_sec = time.time() - 3600  # 一小時前
+    session.last_activity = old_ts_sec
+
+    with TestClient(mux_manager.app) as client:
+        with client.websocket_connect("/ws?lang=zh-TW") as ws:
+            # 初始握手會帶上 status_update（舊前端相容路徑）
+            types_seen = []
+            status_update_msg = None
+            for _ in range(8):
+                msg = _try_recv_json(ws, timeout=1.0)
+                if msg is None:
+                    break
+                types_seen.append(msg.get("type"))
+                if msg.get("type") == "status_update":
+                    status_update_msg = msg
+                    break
+
+            assert status_update_msg is not None, f"未收到 status_update，已收到: {types_seen}"
+
+            # status_info 中 last_activity 是 unix 毫秒整數（見
+            # WebFeedbackSession.get_status_info），不能反映「發送當下」的時間。
+            status_info = status_update_msg.get("status_info") or {}
+            la = status_info.get("last_activity")
+            assert la is not None, "status_info 應包含 last_activity 欄位"
+            assert isinstance(la, int), (
+                f"last_activity 應為毫秒整數，實際: {la!r} ({type(la).__name__})"
+            )
+
+            # 正規化成秒再與真實的 session.last_activity 比較
+            la_sec = la / 1000.0
+            assert abs(la_sec - old_ts_sec) < 1.0, (
+                f"status_update.status_info.last_activity 應反映會話真實活動時間 "
+                f"{old_ts_sec}，而不是連線當下的時間；實際收到(秒)：{la_sec}"
+            )

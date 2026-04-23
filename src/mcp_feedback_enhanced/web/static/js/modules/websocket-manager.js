@@ -298,19 +298,26 @@
                     if (data.session && data.session.session_id) {
                         store.upsertSession(data.session);
                     } else if (data.session_info && data.session_info.session_id) {
+                        // 舊前端相容路徑：reconnection 重放時也會走這條分支，
+                        // 不代表使用者有新操作，因此不要把 last_activity 撥到 now，
+                        // 讓側欄卡片上的相對時間保持原樣。
                         store.patchSession(data.session_info.session_id, {
                             project_directory: data.session_info.project_directory,
                             summary: data.session_info.summary,
-                            status: data.session_info.status,
-                            last_activity: Date.now()
+                            status: data.session_info.status
                         });
                     } else if (data.session_id) {
-                        store.patchSession(data.session_id, {
+                        // 只有在後端顯式帶上 last_activity 時才更新，
+                        // 避免缺失欄位時把顯示重置成 0。
+                        var patch = {
                             status: data.status,
                             status_message: data.status_message,
-                            title: data.title,
-                            last_activity: data.last_activity
-                        });
+                            title: data.title
+                        };
+                        if (typeof data.last_activity === 'number') {
+                            patch.last_activity = data.last_activity;
+                        }
+                        store.patchSession(data.session_id, patch);
                     }
                     break;
 
@@ -321,31 +328,47 @@
 
                 case 'session_expired':
                     if (data.session_id) {
-                        store.patchSession(data.session_id, {
-                            status: data.status || 'expired',
-                            last_activity: Date.now()
-                        });
+                        // 過期本身不是使用者「操作」，沿用後端提供的 last_activity
+                        // 若沒有就保持不變，避免視覺上突然變成 "0s"。
+                        var expiredPatch = { status: data.status || 'expired' };
+                        if (typeof data.last_activity === 'number') {
+                            expiredPatch.last_activity = data.last_activity;
+                        }
+                        store.patchSession(data.session_id, expiredPatch);
                     }
                     break;
 
                 case 'session_feedback_submitted':
                     if (data.session_id) {
-                        store.patchSession(data.session_id, {
+                        // 提交回饋屬於真正的使用者操作。優先採用後端送來的
+                        // last_activity（精確的提交時間），沒有就以 client now 兜底。
+                        var submittedPatch = {
                             status: 'feedback_submitted',
-                            feedback_completed: true,
-                            last_activity: Date.now()
-                        });
+                            feedback_completed: true
+                        };
+                        if (typeof data.last_activity === 'number') {
+                            submittedPatch.last_activity = data.last_activity;
+                        } else {
+                            submittedPatch.last_activity = Date.now();
+                        }
+                        store.patchSession(data.session_id, submittedPatch);
                     }
                     break;
 
                 case 'status_update':
                     if (data.status_info && data.status_info.session_id) {
                         var s = data.status_info;
-                        store.patchSession(s.session_id, {
+                        // status_update 只是「狀態鏡像」，在 (re)connection 或
+                        // get_status 主動拉取時都會重發，並不代表剛剛有操作。
+                        // 不要把 last_activity 撥到 now。
+                        var stPatch = {
                             status: s.status,
-                            status_message: s.message || '',
-                            last_activity: Date.now()
-                        });
+                            status_message: s.message || ''
+                        };
+                        if (typeof s.last_activity === 'number') {
+                            stPatch.last_activity = s.last_activity;
+                        }
+                        store.patchSession(s.session_id, stPatch);
                     }
                     break;
 

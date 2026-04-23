@@ -105,12 +105,59 @@
         this.onClearDoneRequest = typeof opts.onClearDoneRequest === 'function' ? opts.onClearDoneRequest : null;
 
         this._renderScheduled = false;
+        this._timeTickTimer = null;
 
         this._bindEvents();
         this._applyCollapseState();
         this._subscribe();
         this.render();
+        this._startTimeTicker();
     }
+
+    // 側欄上的「相對時間」必須靠前端定時刷新（last_activity 在後端只有
+    // 真正的使用者動作才會撥動；心跳不會）。不跑定時器的話，卡片會卡在
+    // 第一次 render 時的 "0s"，永遠不往前走。
+    //
+    // 這裡不調 render()，而是只重寫 .session-card-time 的 textContent：
+    //  - render() 會重新排序卡片（同狀態按 last_activity 倒序），而
+    //    last_activity 並沒變，所以排序結果也不變，只是多做功；
+    //  - 只動時間 span 的 textContent 就足以讓 UI 看起來「時間在走」。
+    // 15s 間隔對於最小粒度 "0s/1s/...59s/1m/..." 已經足夠順。
+    SessionSidebar.prototype._startTimeTicker = function () {
+        if (this._timeTickTimer) return;
+        var self = this;
+        this._timeTickTimer = setInterval(function () {
+            self._tickTimeLabels();
+        }, 15000);
+    };
+
+    SessionSidebar.prototype._stopTimeTicker = function () {
+        if (this._timeTickTimer) {
+            clearInterval(this._timeTickTimer);
+            this._timeTickTimer = null;
+        }
+    };
+
+    SessionSidebar.prototype._tickTimeLabels = function () {
+        if (!this.listEl) return;
+        var sessions = this.store.getSessions();
+        if (!sessions || sessions.length === 0) return;
+        var byId = {};
+        for (var i = 0; i < sessions.length; i++) {
+            var rec = sessions[i];
+            if (rec && rec.session_id) byId[rec.session_id] = rec;
+        }
+        var cards = this.listEl.querySelectorAll('.session-card');
+        for (var j = 0; j < cards.length; j++) {
+            var sid = cards[j].getAttribute('data-session-id');
+            var recX = byId[sid];
+            if (!recX) continue;
+            var timeEl = cards[j].querySelector('.session-card-time');
+            if (timeEl) {
+                timeEl.textContent = fmtRelative(recX.last_activity || recX.created_at);
+            }
+        }
+    };
 
     SessionSidebar.prototype._bindEvents = function () {
         var self = this;

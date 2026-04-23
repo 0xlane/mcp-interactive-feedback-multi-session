@@ -82,6 +82,57 @@ class TestWebFeedbackSessionCleanup:
         self.session.status = SessionStatus.EXPIRED
         assert self.session.is_expired()
 
+    def test_is_expired_keeps_session_alive_with_recent_heartbeat(self):
+        """回歸：last_activity 雖老，但 last_heartbeat 新 → 會話仍視為存活。
+
+        心跳不再撥動 ``last_activity``（否則側欄相對時間會被反覆重置），
+        因此閒置判定必須額外看 ``last_heartbeat``，避免使用者只是盯著
+        頁面沒操作就被誤清理。
+        """
+        now = time.time()
+        self.session.last_activity = now - 300  # 5 分鐘前的真實操作
+        self.session.last_heartbeat = now - 2  # 2 秒前還在心跳
+        assert not self.session.is_expired(), (
+            "瀏覽器仍在發心跳時，即便真實操作很久沒發生也不應被視為過期"
+        )
+
+    def test_is_expired_when_both_stale(self):
+        """當 last_activity 與 last_heartbeat 都超過閒置時限時，應判為過期。"""
+        now = time.time()
+        self.session.last_activity = now - 120
+        self.session.last_heartbeat = now - 120
+        assert self.session.is_expired()
+
+    def test_get_idle_time_uses_most_recent_liveness(self):
+        """``get_idle_time`` 取 last_activity 與 last_heartbeat 的較新者。"""
+        now = time.time()
+        self.session.last_activity = now - 300
+        self.session.last_heartbeat = now - 10
+        idle = self.session.get_idle_time()
+        # 允許少量執行抖動
+        assert 8 <= idle <= 15, f"idle={idle}"
+
+    def test_get_status_info_emits_timestamps_in_milliseconds(self):
+        """``get_status_info`` 回傳的時間欄位必須是「unix 毫秒整數」。
+
+        回歸：早期版本直接把 ``time.time()`` 返回的 float 秒透出來，前端
+        ``fmtRelative`` 以毫秒解讀會得到幾十年的差值，造成側欄時間
+        顯示成 "20000d" 之類的荒謬值。
+        """
+        # 指定一個好對的時間點，避免浮點抖動
+        self.session.created_at = 1_700_000_000.123
+        self.session.last_activity = 1_700_000_123.456
+
+        info = self.session.get_status_info()
+
+        # 欄位存在且為 int
+        assert isinstance(info["created_at"], int), info["created_at"]
+        assert isinstance(info["last_activity"], int), info["last_activity"]
+
+        # 數值應為秒 * 1000 的整數截斷值，與 /api/sessions 等其它廣播對齊
+        assert info["created_at"] == int(1_700_000_000.123 * 1000)
+        assert info["last_activity"] == int(1_700_000_123.456 * 1000)
+
     def test_get_age_and_idle_time(self):
         """測試年齡和空閒時間計算"""
         # 測試年齡

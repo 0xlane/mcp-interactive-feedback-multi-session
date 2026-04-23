@@ -330,14 +330,22 @@ class WebFeedbackSession:
         return True
 
     def get_status_info(self) -> dict[str, Any]:
-        """獲取會話狀態信息"""
+        """獲取會話狀態信息
+
+        注意：時間欄位統一以「unix 毫秒整數」輸出，與
+        ``/api/sessions`` 以及 ``sessions_snapshot`` / ``session_created``
+        等廣播事件保持一致。``self.created_at`` / ``self.last_activity``
+        內部是 ``time.time()`` 回來的 float 秒，所以這裡要 ``* 1000`` 再
+        轉 int。早期版本直接把秒透出來，前端 ``fmtRelative`` 以毫秒解讀
+        會得到幾十年的差值，側欄時間就會跳到 "20000d" 這種荒謬值。
+        """
         return {
             "status": self.status.value,
             "message": self.status_message,
             "feedback_completed": self.feedback_completed.is_set(),
             "has_websocket": self.websocket is not None,
-            "created_at": self.created_at,
-            "last_activity": self.last_activity,
+            "created_at": int(self.created_at * 1000),
+            "last_activity": int(self.last_activity * 1000),
             "project_directory": self.project_directory,
             "summary": self.summary,
             "session_id": self.session_id,
@@ -351,13 +359,24 @@ class WebFeedbackSession:
             SessionStatus.FEEDBACK_SUBMITTED,
         ]
 
+    def _liveness_time(self) -> float:
+        """取「會話最後一次還活著」的時間戳（秒）。
+
+        多會話 HTTP 模式下，心跳只更新 ``last_heartbeat`` 而不再撥動 ``last_activity``
+        （避免側欄卡片上的相對時間被心跳反覆重置）。但閒置過期判定不能只看
+        ``last_activity``，否則使用者只是盯著頁面不操作也會被清理。
+        因此取兩者的最大值當作「最近還活著」的時間。
+        """
+        hb = self.last_heartbeat or 0.0
+        return max(self.last_activity, hb)
+
     def is_expired(self) -> bool:
         """檢查會話是否已過期"""
         # 統一使用 time.time()
         current_time = time.time()
 
-        # 檢查是否超過最大空閒時間
-        idle_time = current_time - self.last_activity
+        # 檢查是否超過最大空閒時間（取 last_activity 與 last_heartbeat 的較新者）
+        idle_time = current_time - self._liveness_time()
         if idle_time > self.max_idle_time:
             debug_log(
                 f"會話 {self.session_id} 空閒時間過長: {idle_time:.1f}秒 > {self.max_idle_time}秒"
@@ -370,7 +389,7 @@ class WebFeedbackSession:
 
         # 檢查是否處於錯誤或超時狀態且超過一定時間
         if self.status in [SessionStatus.ERROR, SessionStatus.TIMEOUT]:
-            error_time = current_time - self.last_activity
+            error_time = current_time - self._liveness_time()
             if error_time > 300:  # 錯誤狀態超過5分鐘視為過期
                 debug_log(
                     f"會話 {self.session_id} 錯誤狀態時間過長: {error_time:.1f}秒"
@@ -385,9 +404,13 @@ class WebFeedbackSession:
         return current_time - self.created_at
 
     def get_idle_time(self) -> float:
-        """獲取會話空閒時間（秒）"""
+        """獲取會話空閒時間（秒）。
+
+        與 :meth:`is_expired` 保持一致：取 ``last_activity`` 與 ``last_heartbeat``
+        的較新者，這樣瀏覽器保持連線（只是沒新操作）時不會被視為長時間閒置。
+        """
         current_time = time.time()
-        return current_time - self.last_activity
+        return current_time - self._liveness_time()
 
     def _schedule_auto_cleanup(self):
         """安排自動清理定時器"""

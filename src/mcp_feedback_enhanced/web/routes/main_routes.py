@@ -833,8 +833,13 @@ async def handle_websocket_message_mux(
     # ------- 不需要 session 的消息 -------
     if message_type == "heartbeat":
         if target_session is not None:
+            # 心跳只代表「瀏覽器連線還活著」，不是「使用者有操作」。
+            # 只更新 last_heartbeat；last_activity 由真正的狀態流轉（next_step /
+            # submit_feedback / cancel / set_error / set_expired）負責更新。
+            # 否則側欄卡片上的相對時間會被心跳反覆撥到 "剛剛"，讓人誤以為
+            # 一直有新活動。閒置過期判定已改為 max(last_activity, last_heartbeat)，
+            # 所以瀏覽器保持連線時不會被誤清理。
             target_session.last_heartbeat = time.time()
-            target_session.last_activity = time.time()
         try:
             await websocket.send_json(
                 {

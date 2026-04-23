@@ -156,9 +156,19 @@
                     default:
                         statusKey = 'connectionMonitor.unknown';
                 }
-                statusText.setAttribute('data-i18n', statusKey);
-                if (window.i18nManager) {
-                    statusText.textContent = window.i18nManager.t(statusKey);
+                // 重連狀態下 i18n 模板為 "重連中... (第{attempt}次)"，呼叫方（websocket-
+                // manager）已經把 {attempt} 替換好並以 message 參數傳入，這裡若還沿用
+                // data-i18n 讓 i18nManager 重新翻譯會把佔位符翻回來，導致 UI 出現字面
+                // 的 "{attempt}"。所以只要能拿到 message 就直接寫入並移除 data-i18n，
+                // 避免下一次語言切換時被覆蓋。
+                if (status === 'reconnecting' && message) {
+                    statusText.removeAttribute('data-i18n');
+                    statusText.textContent = message;
+                } else {
+                    statusText.setAttribute('data-i18n', statusKey);
+                    if (window.i18nManager) {
+                        statusText.textContent = window.i18nManager.t(statusKey);
+                    }
                 }
             }
         }

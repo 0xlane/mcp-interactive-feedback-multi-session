@@ -210,6 +210,26 @@
         "archive": "归档此会话",
         "empty": "尚无会话\n等待 MCP 调用中..."
     },
+    "sidebar": {
+        "sessionHistory": "会话历史",
+        "sessionHistoryTitle": "查看会话历史与今日统计"
+    },
+    "topbar": {
+        "settings": "设置",
+        "about": "关于",
+        "sessionHistory": "会话历史"
+    },
+    "modals": {
+        "sessions": {
+            "title": "📊 会话历史"
+        },
+        "settings": {
+            "title": "⚙️ 设置"
+        },
+        "about": {
+            "title": "ℹ️ 关于"
+        }
+    },
     "notifications": {
         "feedback_sent": "反馈已发送",
         "command_executed": "命令已执行",

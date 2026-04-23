@@ -215,6 +215,26 @@
         "archive": "歸檔此會話",
         "empty": "尚無會話\n等待 MCP 調用中..."
     },
+    "sidebar": {
+        "sessionHistory": "會話歷史",
+        "sessionHistoryTitle": "查看會話歷史與今日統計"
+    },
+    "topbar": {
+        "settings": "設定",
+        "about": "關於",
+        "sessionHistory": "會話歷史"
+    },
+    "modals": {
+        "sessions": {
+            "title": "📊 會話歷史"
+        },
+        "settings": {
+            "title": "⚙️ 設定"
+        },
+        "about": {
+            "title": "ℹ️ 關於"
+        }
+    },
     "notifications": {
         "feedback_sent": "回饋已發送",
         "command_executed": "指令已執行",

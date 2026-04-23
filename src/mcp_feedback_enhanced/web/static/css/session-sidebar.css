@@ -173,6 +173,56 @@
   opacity: 0.6;
 }
 
+/* ============================================================
+ * 側欄底部（全局入口區：會話歷史）
+ * ============================================================ */
+
+.sidebar-footer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  text-align: left;
+}
+
+.sidebar-footer-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.sidebar-footer-btn:active {
+  transform: translateY(1px);
+}
+
+.sidebar-footer-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.sidebar-footer-label {
+  flex: 1 1 auto;
+}
+
 /* i18n 翻譯通過 textContent 注入，`<br>` 會被轉成字面字串；為了讓
    `empty` 翻譯裡的 \n 能被渲染成換行，這裡開啟 pre-line。 */
 .sidebar-empty-text {

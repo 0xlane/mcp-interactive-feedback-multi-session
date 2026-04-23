@@ -209,6 +209,26 @@
         "archive": "Archive this session",
         "empty": "No sessions yet\nWaiting for MCP calls..."
     },
+    "sidebar": {
+        "sessionHistory": "Session History",
+        "sessionHistoryTitle": "View session history and today's stats"
+    },
+    "topbar": {
+        "settings": "Settings",
+        "about": "About",
+        "sessionHistory": "Session History"
+    },
+    "modals": {
+        "sessions": {
+            "title": "📊 Session History"
+        },
+        "settings": {
+            "title": "⚙️ Settings"
+        },
+        "about": {
+            "title": "ℹ️ About"
+        }
+    },
     "notifications": {
         "feedback_sent": "Feedback sent",
         "command_executed": "Command executed",

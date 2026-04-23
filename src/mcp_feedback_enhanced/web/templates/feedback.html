@@ -443,6 +443,19 @@
                     </div>
                 </div>
             </div>
+            <div class="sidebar-footer">
+                <button type="button"
+                        id="openSessionHistoryBtn"
+                        class="sidebar-footer-btn"
+                        data-modal-open="sessionsModal"
+                        data-i18n-title="sidebar.sessionHistoryTitle"
+                        data-i18n-aria-label="sidebar.sessionHistory"
+                        title="查看會話歷史與今日統計"
+                        aria-label="會話歷史">
+                    <span class="sidebar-footer-icon" aria-hidden="true">📊</span>
+                    <span class="sidebar-footer-label" data-i18n="sidebar.sessionHistory">會話歷史</span>
+                </button>
+            </div>
         </aside>
 
         <!-- 折疊狀態下的迷你邊條，點擊即可展開 -->
@@ -514,6 +527,29 @@
         <!-- 分隔符 -->
         <span class="info-separator">·</span>
 
+        <!-- 全局操作入口 -->
+        <div class="topbar-actions">
+            <button type="button"
+                    id="openSettingsBtn"
+                    class="topbar-icon-btn"
+                    data-modal-open="settingsModal"
+                    data-i18n-title="topbar.settings"
+                    data-i18n-aria-label="topbar.settings"
+                    title="設定"
+                    aria-label="設定">⚙️</button>
+            <button type="button"
+                    id="openAboutBtn"
+                    class="topbar-icon-btn"
+                    data-modal-open="aboutModal"
+                    data-i18n-title="topbar.about"
+                    data-i18n-aria-label="topbar.about"
+                    title="關於"
+                    aria-label="關於">ℹ️</button>
+        </div>
+
+        <!-- 分隔符 -->
+        <span class="info-separator">·</span>
+
         <!-- 連線狀態 -->
         <div class="connection-status-compact" id="connectionStatusMinimal">
             <span class="status-dot"></span>
@@ -532,7 +568,7 @@
                 <!-- 分頁導航 -->
                 <div class="tabs">
                 <div class="tab-buttons">
-                    <!-- 工作區分頁 - 主要分頁 -->
+                    <!-- 會話級 Tab：工作區 / AI 摘要 / 命令 -->
                     <button class="tab-button active" data-tab="combined" data-i18n="tabs.combined">
                         📝 工作區
                     </button>
@@ -541,15 +577,6 @@
                     </button>
                     <button class="tab-button" data-tab="command" data-i18n="tabs.command">
                         ⚡ 命令
-                    </button>
-                    <button class="tab-button" data-tab="sessions" data-i18n="tabs.sessions">
-                        📋 會話管理
-                    </button>
-                    <button class="tab-button" data-tab="settings" data-i18n="tabs.settings">
-                        ⚙️ 設定
-                    </button>
-                    <button class="tab-button" data-tab="about" data-i18n="tabs.about">
-                        ℹ️ 關於
                     </button>
                 </div>
             </div>
@@ -662,6 +689,20 @@
                     <div class="combined-section">
                         <div class="section-header">
                             <h3 class="combined-section-title" data-i18n="combined.summaryTitle">📋 AI 工作摘要</h3>
+                            <div class="section-header-actions">
+                                <button type="button"
+                                        id="copyCurrentSessionContent"
+                                        class="btn-icon-sm"
+                                        data-i18n-title="sessionManagement.copySessionContent"
+                                        title="複製會話內容"
+                                        aria-label="複製會話內容">📋</button>
+                                <button type="button"
+                                        id="copyCurrentUserContent"
+                                        class="btn-icon-sm"
+                                        data-i18n-title="sessionManagement.copyUserContent"
+                                        title="複製用戶內容"
+                                        aria-label="複製用戶內容">📝</button>
+                            </div>
                         </div>
                         <div class="combined-summary">
                             <div id="combinedSummaryContent" class="text-input" style="min-height: 200px; cursor: text; padding: 12px; line-height: 1.6; word-wrap: break-word; overflow-wrap: break-word;" data-dynamic-content="aiSummary">{{ summary }}</div>
@@ -718,55 +759,22 @@
             </div>
 
             <!-- ===== 會話管理分頁 ===== -->
-            <div id="tab-sessions" class="tab-content">
-                <div class="section-description" data-i18n="sessionManagement.description">
-                    管理當前會話和歷史會話記錄，查看會話統計資訊。
-                </div>
-
-                <!-- 面板標題和控制 -->
-                <div class="session-panel-header">
-                    <h3 data-i18n="sessionManagement.title">會話管理</h3>
-                    <div class="panel-controls">
-                        <button class="btn-icon" id="refreshSessions" data-i18n-title="sessionManagement.refresh" title="重新整理">
-                            🔄
-                        </button>
-                    </div>
-                </div>
-
-                <div class="session-panel-content">
-                    <!-- 當前活躍會話 -->
-                    <div class="current-session-section">
-                        <h4 data-i18n="sessionManagement.currentSession">當前會話</h4>
-                        <div class="session-card active" id="currentSessionCard">
-                            <div class="session-header">
-                                <div class="session-id"><span data-i18n="sessionManagement.sessionId">會話 ID</span>: {{ session_id[:8] if session_id else 'loading' }}...</div>
-                                <div class="session-status">
-                                    <span class="status-badge waiting" data-i18n="connectionMonitor.waiting">等待中</span>
-                                </div>
-                            </div>
-                            <div class="session-info">
-                                <div class="session-time"><span data-i18n="sessionManagement.createdTime">建立時間</span>: --:--:--</div>
-                                <div class="session-project"><span data-i18n="sessionManagement.project">專案</span>: {{ project_directory }}</div>
-                                <div class="session-summary"><span data-i18n="sessionManagement.aiSummary">AI 摘要</span>: <span data-i18n="sessionManagement.loading">載入中...</span></div>
-                            </div>
-                            <div class="session-actions">
-                                <button class="btn-small" id="viewSessionDetails" data-i18n="sessionManagement.viewDetails">詳細資訊</button>
-                                <button class="btn-small btn-primary" id="copyCurrentSessionContent"
-                                        data-i18n="sessionManagement.copySessionContent"
-                                        data-i18n-title="sessionManagement.copySessionContent"
-                                        aria-label="複製會話內容">
-                                    📋 <span data-i18n="sessionManagement.copySessionContent">複製會話內容</span>
-                                </button>
-                                <button class="btn-small btn-secondary" id="copyCurrentUserContent"
-                                        data-i18n="sessionManagement.copyUserContent"
-                                        data-i18n-title="sessionManagement.copyUserContent"
-                                        aria-label="複製用戶內容">
-                                    📝 <span data-i18n="sessionManagement.copyUserContent">複製用戶內容</span>
-                                </button>
-                            </div>
+            <div id="sessionsModal" class="app-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sessionsModalTitle">
+                <div class="modal-backdrop" data-modal-dismiss="sessionsModal"></div>
+                <div class="modal-content modal-content-wide">
+                    <div class="modal-header">
+                        <h3 id="sessionsModalTitle" data-i18n="modals.sessions.title">會話歷史</h3>
+                        <div class="modal-header-actions">
+                            <button class="btn-icon" id="refreshSessions"
+                                    data-i18n-title="sessionManagement.refresh" title="重新整理"
+                                    aria-label="重新整理">🔄</button>
+                            <button class="modal-close" data-modal-dismiss="sessionsModal"
+                                    aria-label="關閉">&times;</button>
                         </div>
                     </div>
+                    <div class="modal-body">
 
+                <div class="session-panel-content">
                     <!-- 會話歷史記錄 -->
                     <div class="session-history-section">
                         <div class="session-history-header">
@@ -814,10 +822,21 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                    </div> <!-- /.modal-body -->
+                </div> <!-- /.modal-content -->
+            </div> <!-- /#sessionsModal -->
 
-            <!-- 設定分頁 -->
-            <div id="tab-settings" class="tab-content">
+            <!-- 設定模態 -->
+            <div id="settingsModal" class="app-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+                <div class="modal-backdrop" data-modal-dismiss="settingsModal"></div>
+                <div class="modal-content modal-content-wide">
+                    <div class="modal-header">
+                        <h3 id="settingsModalTitle" data-i18n="modals.settings.title">⚙️ 設定</h3>
+                        <div class="modal-header-actions">
+                            <button class="modal-close" data-modal-dismiss="settingsModal" aria-label="關閉">&times;</button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
                 <!-- 介面設定卡片 -->
                 <div class="settings-card">
                     <div class="settings-card-header">
@@ -1143,10 +1162,21 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                    </div> <!-- /.modal-body -->
+                </div> <!-- /.modal-content -->
+            </div> <!-- /#settingsModal -->
 
-            <!-- 關於分頁 -->
-            <div id="tab-about" class="tab-content">
+            <!-- 關於模態 -->
+            <div id="aboutModal" class="app-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="aboutModalTitle">
+                <div class="modal-backdrop" data-modal-dismiss="aboutModal"></div>
+                <div class="modal-content modal-content-wide">
+                    <div class="modal-header">
+                        <h3 id="aboutModalTitle" data-i18n="modals.about.title">ℹ️ 關於</h3>
+                        <div class="modal-header-actions">
+                            <button class="modal-close" data-modal-dismiss="aboutModal" aria-label="關閉">&times;</button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
                 <!-- 主要資訊卡片 -->
                 <div class="settings-card">
                     <div class="settings-card-header">
@@ -1220,7 +1250,9 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                    </div> <!-- /.modal-body -->
+                </div> <!-- /.modal-content -->
+            </div> <!-- /#aboutModal -->
             </div> <!-- 關閉 main-content-area -->
         </main>
 
@@ -1273,6 +1305,8 @@
     <script src="/static/js/modules/session-manager.js?v=2025010510"></script>
     <!-- 多會話側欄（Phase 3） -->
     <script src="/static/js/modules/session-sidebar.js?v=2025010519"></script>
+    <!-- 應用外殼模態管理器（Phase 3.1：設定/關於/會話歷史） -->
+    <script src="/static/js/modules/app-shell-modal.js?v=2025010520"></script>
     <!-- 多會話通知徽章（title 計數 + favicon 小紅點 + 系統通知 + Cmd/Ctrl+1..9） -->
     <script src="/static/js/modules/notify-badge.js?v=2025010516"></script>
     <script src="/static/js/modules/file-upload-manager.js?v=2025010510"></script>

@@ -194,6 +194,27 @@
             "message": "會話已完成"
         }
     },
+    "sessionStatus": {
+        "waiting": "等待中",
+        "active": "進行中",
+        "feedback_submitted": "已提交",
+        "completed": "已完成",
+        "expired": "已過期",
+        "timeout": "逾時",
+        "canceled": "已取消",
+        "error": "錯誤"
+    },
+    "sessionList": {
+        "title": "會話列表",
+        "waiting": "等待",
+        "active": "進行中",
+        "clearDone": "清除所有已完成的會話",
+        "clearDoneLabel": "清除已完成",
+        "collapse": "收起側欄",
+        "expand": "展開側欄",
+        "archive": "歸檔此會話",
+        "empty": "尚無會話\n等待 MCP 調用中..."
+    },
     "notifications": {
         "feedback_sent": "回饋已發送",
         "command_executed": "指令已執行",
@@ -371,7 +392,6 @@
             "reconnects": "重連"
         }
     },
-
     "dynamic": {
         "aiSummary": "測試 Web UI 功能\n\n🎯 **功能測試項目：**\n- Web UI 服務器啟動和運行\n- WebSocket 即時通訊\n- 回饋提交功能\n- 圖片上傳和預覽\n- 命令執行功能\n- 智能 Ctrl+V 圖片貼上\n- 多語言介面功能\n\n📋 **測試步驟：**\n1. 測試圖片上傳（拖拽、選擇檔案、剪貼簿）\n2. 在文字框內按 Ctrl+V 測試智能貼上\n3. 嘗試切換語言（繁中/簡中/英文）\n4. 測試命令執行功能\n5. 提交回饋和圖片\n\n請測試這些功能並提供回饋！",
         "terminalWelcome": "歡迎使用互動回饋終端\n========================================\n專案目錄: {sessionId}\n輸入命令後按 Enter 或點擊執行按鈕\n支援的命令: ls, dir, pwd, cat, type 等\n\n$ "

@@ -53,6 +53,13 @@
         this.isInitialized = false;
         this.pendingSubmission = null;
 
+        // Phase 3：多會話側欄
+        this.sessionSidebar = null;
+        this._unsubscribeActiveChange = null;
+        // Phase 3：每會話獨立草稿 { sessionId: textareaValue }
+        this._drafts = Object.create(null);
+        this._lastActiveSessionId = null;
+
         // 初始化防抖函數
         this.initDebounceHandlers();
 
@@ -112,6 +119,9 @@
                     })
                     .then(function() {
                         return self.setupCleanupHandlers();
+                    })
+                    .then(function() {
+                        return self.setupMultiSessionSidebar();
                     })
                     .then(function() {
                         self.isInitialized = true;
@@ -399,6 +409,280 @@
     };
 
     /**
+     * Phase 3：初始化多會話側欄 + 訂閱 active 變化
+     *
+     * - 創建 SessionSidebar 實例（渲染左側列表）
+     * - 點擊卡片：切換 active，並把 UI（摘要、頂欄 session id、命令輸出）同步到該會話
+     * - 點擊 × 或清除按鈕：通過 WS 歸檔 / REST 批量刪除
+     * - store.ACTIVE_CHANGED / SNAPSHOT_APPLIED → 同步 UI
+     */
+    FeedbackApp.prototype.setupMultiSessionSidebar = function () {
+        const self = this;
+        return new Promise(function (resolve) {
+            try {
+                const SessionSidebarClass = window.MCPFeedback && window.MCPFeedback.SessionSidebar;
+                const store = window.MCPFeedback && window.MCPFeedback.sessionStore;
+                if (!SessionSidebarClass || !store) {
+                    console.warn('⚠️ SessionSidebar/SessionStore 未載入，跳過初始化');
+                    resolve();
+                    return;
+                }
+
+                self.sessionSidebar = new SessionSidebarClass({
+                    store: store,
+                    onSessionActivate: function (sid) {
+                        self.applyActiveSessionToUI(sid);
+                    },
+                    onArchiveRequest: function (sid) {
+                        if (self.webSocketManager && self.webSocketManager.isReady()) {
+                            self.webSocketManager.archiveSession(sid);
+                        } else {
+                            fetch('/api/archive-session/' + encodeURIComponent(sid), { method: 'POST' })
+                                .catch(function (e) { console.error(e); });
+                        }
+                    },
+                    onClearDoneRequest: function () {
+                        var S = window.MCPFeedback.SessionStore;
+                        var store = window.MCPFeedback.sessionStore;
+                        var targets = store.getSessions().filter(function (rec) {
+                            return S.isTerminal(rec.status);
+                        });
+                        if (targets.length === 0) return;
+                        targets.forEach(function (rec) {
+                            if (self.webSocketManager && self.webSocketManager.isReady()) {
+                                self.webSocketManager.archiveSession(rec.session_id);
+                            } else {
+                                fetch('/api/archive-session/' + encodeURIComponent(rec.session_id),
+                                      { method: 'POST' })
+                                    .catch(function (e) { console.error(e); });
+                            }
+                        });
+                    }
+                });
+
+                // 訂閱 active 變化：切換 UI 顯示
+                const S = window.MCPFeedback.SessionStore;
+                self._unsubscribeActiveChange = store.on(S.EVENTS.ACTIVE_CHANGED, function (ev) {
+                    self.applyActiveSessionToUI(ev.current);
+                });
+                store.on(S.EVENTS.SNAPSHOT_APPLIED, function () {
+                    self.applyActiveSessionToUI(store.getActiveSessionId());
+                });
+                store.on(S.EVENTS.SESSION_UPDATED, function (ev) {
+                    if (!ev || !ev.session) return;
+                    if (ev.session.session_id !== store.getActiveSessionId()) return;
+                    self._renderSessionMeta(ev.session);
+                    // 狀態變化（例如 waiting → feedback_submitted）：同步按鈕 / 輸入框
+                    var prevStatus = ev.prev && ev.prev.status;
+                    if (prevStatus !== ev.session.status) {
+                        self._syncFeedbackStateToSession(ev.session);
+                    }
+                });
+
+                console.log('✅ 多會話側欄初始化完成');
+                resolve();
+            } catch (error) {
+                console.error('❌ 多會話側欄初始化失敗:', error);
+                resolve();
+            }
+        });
+    };
+
+    /**
+     * Phase 3：當 active session 變化時，把會話的 summary/project/session_id 應用到主 UI
+     */
+    FeedbackApp.prototype.applyActiveSessionToUI = function (sessionId) {
+        const store = window.MCPFeedback && window.MCPFeedback.sessionStore;
+        if (!store) return;
+
+        const ta = document.querySelector('#combinedFeedbackText');
+
+        if (this._lastActiveSessionId && this._lastActiveSessionId !== sessionId && ta) {
+            this._drafts[this._lastActiveSessionId] = ta.value || '';
+        }
+
+        if (!sessionId) {
+            this._renderEmptyState();
+            this._lastActiveSessionId = null;
+            return;
+        }
+        const rec = store.getSession(sessionId);
+        if (!rec) {
+            this._renderEmptyState();
+            this._lastActiveSessionId = null;
+            return;
+        }
+
+        this.currentSessionId = sessionId;
+
+        if (rec.has_pending_notification) {
+            store.patchSession(sessionId, { has_pending_notification: false });
+        }
+
+        this._renderSessionMeta(rec);
+
+        const commandOutput = document.querySelector('#commandOutput');
+        if (commandOutput) commandOutput.textContent = '';
+
+        if (ta) {
+            ta.value = this._drafts[sessionId] || '';
+            try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+        }
+
+        this._syncFeedbackStateToSession(rec);
+
+        if (this.webSocketManager && this.webSocketManager.isReady() &&
+            this._lastActiveSessionId !== sessionId) {
+            try {
+                this.webSocketManager.send({
+                    type: 'set_active_session',
+                    session_id: sessionId
+                });
+            } catch (_) { /* 容忍靜默失敗 */ }
+        }
+
+        this._lastActiveSessionId = sessionId;
+    };
+
+    /**
+     * 把 SessionStore 中 record.status 轉換為 uiManager 的 feedbackState，
+     * 並應用到表單（包含 enable/disable、按鈕文案、占位符）。
+     *
+     * 映射：
+     *   waiting     → FEEDBACK_WAITING (form enabled, primary button)
+     *   active      → FEEDBACK_WAITING
+     *   processing  → FEEDBACK_PROCESSING
+     *   feedback_submitted / completed / expired / timeout / canceled / error
+     *               → FEEDBACK_SUBMITTED (read-only)
+     */
+    FeedbackApp.prototype._syncFeedbackStateToSession = function (rec) {
+        if (!this.uiManager || !rec) return;
+        const C = window.MCPFeedback.Utils.CONSTANTS;
+        const status = String(rec.status || 'waiting').toLowerCase();
+        let targetState;
+        switch (status) {
+            case 'waiting':
+            case 'active':
+                targetState = C.FEEDBACK_WAITING;
+                break;
+            case 'processing':
+                targetState = C.FEEDBACK_PROCESSING;
+                break;
+            case 'feedback_submitted':
+            case 'completed':
+            case 'expired':
+            case 'timeout':
+            case 'canceled':
+            case 'error':
+                targetState = C.FEEDBACK_SUBMITTED;
+                break;
+            default:
+                targetState = C.FEEDBACK_WAITING;
+        }
+
+        const ta = document.querySelector('#combinedFeedbackText');
+        if (ta && ta.getAttribute('data-empty-state')) {
+            ta.removeAttribute('data-empty-state');
+            if (ta.getAttribute('data-original-placeholder')) {
+                ta.placeholder = ta.getAttribute('data-original-placeholder');
+            }
+        }
+
+        this.uiManager.setFeedbackState(targetState, rec.session_id);
+    };
+
+    FeedbackApp.prototype._setFeedbackFormDisabled = function (disabled) {
+        const ta = document.querySelector('#combinedFeedbackText');
+        if (ta) {
+            ta.disabled = !!disabled;
+            if (disabled) {
+                ta.setAttribute('data-empty-state', '1');
+                ta.placeholder = '尚無會話可供反饋，等待 MCP 調用中...';
+            } else {
+                ta.removeAttribute('data-empty-state');
+                if (ta.getAttribute('data-original-placeholder')) {
+                    ta.placeholder = ta.getAttribute('data-original-placeholder');
+                }
+            }
+        }
+        const btn = document.querySelector('#submitBtn');
+        if (btn) {
+            btn.disabled = !!disabled;
+        }
+        if (this.uiManager) {
+            const C = window.MCPFeedback.Utils.CONSTANTS;
+            if (disabled) {
+                this.uiManager.feedbackState = C.FEEDBACK_NO_SESSION;
+            } else if (this.uiManager.feedbackState === C.FEEDBACK_NO_SESSION) {
+                this.uiManager.feedbackState = C.FEEDBACK_WAITING;
+            }
+            if (typeof this.uiManager.updateUIState === 'function') {
+                this.uiManager.updateUIState();
+            }
+        }
+    };
+
+    /**
+     * 將一個會話記錄的 meta 信息寫入頂欄和摘要區
+     */
+    FeedbackApp.prototype._renderSessionMeta = function (rec) {
+        if (!rec) return;
+
+        const sidEl = document.querySelector('#currentSessionId');
+        if (sidEl) {
+            sidEl.textContent = rec.session_id ? rec.session_id.slice(0, 6) : '--';
+            sidEl.setAttribute('data-full-id', rec.session_id || '');
+        }
+
+        const pathEl = document.querySelector('#projectPathDisplay');
+        if (pathEl) {
+            const p = rec.project_directory || '';
+            pathEl.textContent = p.length > 30 ? p.slice(-30) : p;
+            pathEl.setAttribute('data-full-path', p);
+        }
+
+        if (this.uiManager && typeof this.uiManager.updateAISummaryContent === 'function') {
+            this.uiManager.updateAISummaryContent(rec.summary || '');
+        } else {
+            const summaryEls = document.querySelectorAll('#combinedSummaryContent, #summaryContent');
+            summaryEls.forEach(function (el) {
+                if (el) el.textContent = rec.summary || '';
+            });
+        }
+    };
+
+    /**
+     * 當沒有任何 active session 時，顯示占位
+     */
+    FeedbackApp.prototype._renderEmptyState = function () {
+        const sidEl = document.querySelector('#currentSessionId');
+        if (sidEl) {
+            sidEl.textContent = '--';
+            sidEl.setAttribute('data-full-id', '');
+        }
+        const pathEl = document.querySelector('#projectPathDisplay');
+        if (pathEl) {
+            pathEl.textContent = '';
+            pathEl.setAttribute('data-full-path', '');
+        }
+        const summaryEls = document.querySelectorAll('#combinedSummaryContent, #summaryContent');
+        summaryEls.forEach(function (el) {
+            if (el) el.textContent = '等待 MCP 調用建立會話...';
+        });
+        const commandOutput = document.querySelector('#commandOutput');
+        if (commandOutput) commandOutput.textContent = '';
+
+        const ta = document.querySelector('#combinedFeedbackText');
+        if (ta) {
+            if (!ta.getAttribute('data-original-placeholder')) {
+                ta.setAttribute('data-original-placeholder', ta.placeholder || '');
+            }
+            ta.value = '';
+        }
+        this._setFeedbackFormDisabled(true);
+    };
+
+    /**
      * 處理設定變更
      */
     FeedbackApp.prototype.handleSettingsChange = function(settings) {
@@ -664,17 +948,31 @@
     FeedbackApp.prototype._originalHandleWebSocketMessage = function(data) {
         console.log('📨 處理 WebSocket 訊息:', data);
 
+        // Phase 3: 多會話過濾 —— 命令輸出僅顯示屬於當前 active session 的事件
+        var activeSidForCmd = (window.MCPFeedback && window.MCPFeedback.sessionStore) ?
+            window.MCPFeedback.sessionStore.getActiveSessionId() : null;
+        var msgSid = data.session_id || null;
+        var isForActiveSession = !msgSid || !activeSidForCmd || msgSid === activeSidForCmd;
+
         switch (data.type) {
             case 'command_output':
-                this.appendCommandOutput(data.output);
+                if (isForActiveSession) {
+                    this.appendCommandOutput(data.output);
+                } else {
+                    console.log('🔇 忽略非 active session 的 command_output (sid=' + msgSid + ')');
+                }
                 break;
             case 'command_complete':
-                this.appendCommandOutput('\n[命令完成，退出碼: ' + data.exit_code + ']\n');
-                this.enableCommandInput();
+                if (isForActiveSession) {
+                    this.appendCommandOutput('\n[命令完成，退出碼: ' + data.exit_code + ']\n');
+                    this.enableCommandInput();
+                }
                 break;
             case 'command_error':
-                this.appendCommandOutput('\n[錯誤: ' + data.error + ']\n');
-                this.enableCommandInput();
+                if (isForActiveSession) {
+                    this.appendCommandOutput('\n[錯誤: ' + data.error + ']\n');
+                    this.enableCommandInput();
+                }
                 break;
             case 'feedback_received':
                 console.log('回饋已收到');
@@ -824,17 +1122,32 @@
 
         // 檢查是否是新會話創建的通知
         if (data.action === 'new_session_created' || data.type === 'new_session_created') {
-            console.log('🆕 檢測到新會話創建，局部更新頁面內容');
+            console.log('🆕 檢測到新會話創建通知');
 
-            // 播放音效通知
+            // Phase 3：新會話已由 broadcast 的 ``session_created`` 事件推入 store + sidebar，
+            // 這裡僅做一次音效/通知提醒，**不**再把 UI 強行切到新 session，避免打斷用戶
+            // 當前正在看的 session。
+            const hasStore = window.MCPFeedback && window.MCPFeedback.sessionStore;
+            if (hasStore) {
+                if (this.audioManager) {
+                    this.audioManager.playNotification();
+                }
+                if (this.notificationManager && data.session_info) {
+                    this.notificationManager.notifyNewSession(
+                        data.session_info.session_id,
+                        data.session_info.project_directory || data.project_directory || '未知專案'
+                    );
+                }
+                this.executeAutoCommandOnNewSession();
+                return;
+            }
+
             if (this.audioManager) {
                 this.audioManager.playNotification();
             }
-            
-            // 執行新會話自動命令
+
             this.executeAutoCommandOnNewSession();
 
-            // 發送瀏覽器通知
             if (this.notificationManager && data.session_info) {
                 this.notificationManager.notifyNewSession(
                     data.session_info.session_id,
@@ -1205,8 +1518,10 @@
                 this.webSocketManager.stopSessionTimeout();
             }
 
-            // 3. 發送回饋到 AI 助手
-            const success = this.webSocketManager.send({
+            // 3. 發送回饋到 AI 助手（Phase 3：自動帶上 active session_id）
+            const storeForSubmit = window.MCPFeedback && window.MCPFeedback.sessionStore;
+            const submitSid = storeForSubmit ? storeForSubmit.getActiveSessionId() : null;
+            const success = this.webSocketManager.sendToActive({
                 type: 'submit_feedback',
                 feedback: feedbackData.feedback,
                 images: feedbackData.images,
@@ -1214,13 +1529,14 @@
             });
 
             if (success) {
-                // 重置表單狀態但保留文字內容
                 if (this.uiManager) {
-                    this.uiManager.resetFeedbackForm(false);  // false 表示不清空文字
+                    this.uiManager.resetFeedbackForm(true);
                 }
-                // 只清空圖片
                 if (this.imageHandler) {
                     this.imageHandler.clearImages();
+                }
+                if (submitSid && this._drafts) {
+                    delete this._drafts[submitSid];
                 }
                 console.log('📤 回饋已發送，等待服務器確認...');
             } else {
@@ -1407,7 +1723,7 @@
 
         // 發送命令
         try {
-            const success = this.webSocketManager.send({
+            const success = this.webSocketManager.sendToActive({
                 type: 'run_command',
                 command: command
             });
@@ -1487,10 +1803,9 @@
         console.log('🚀 執行新會話自動命令:', command);
         this.appendCommandOutput('🆕 [自動執行] $ ' + command + '\n');
         
-        // 使用 WebSocket 發送命令
         if (this.webSocketManager && this.webSocketManager.isConnected) {
             console.log('📡 WebSocket 已連接，發送命令:', command);
-            this.webSocketManager.send({
+            this.webSocketManager.sendToActive({
                 type: 'run_command',
                 command: command
             });
@@ -1518,10 +1833,9 @@
         console.log('🚀 執行提交回饋後自動命令:', command);
         this.appendCommandOutput('✅ [自動執行] $ ' + command + '\n');
         
-        // 使用 WebSocket 發送命令
         if (this.webSocketManager && this.webSocketManager.isConnected) {
             console.log('📡 WebSocket 已連接，發送命令:', command);
-            this.webSocketManager.send({
+            this.webSocketManager.sendToActive({
                 type: 'run_command',
                 command: command
             });
@@ -1651,9 +1965,8 @@
         console.log('🧪 測試執行命令:', command);
         this.appendCommandOutput(prefix + '$ ' + command + '\n');
         
-        // 使用 WebSocket 發送命令
         if (this.webSocketManager && this.webSocketManager.isConnected) {
-            this.webSocketManager.send({
+            this.webSocketManager.sendToActive({
                 type: 'run_command',
                 command: command
             });

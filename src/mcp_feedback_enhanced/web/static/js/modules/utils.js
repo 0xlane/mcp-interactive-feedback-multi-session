@@ -451,6 +451,7 @@
             FEEDBACK_WAITING: 'waiting_for_feedback',
             FEEDBACK_SUBMITTED: 'feedback_submitted',
             FEEDBACK_PROCESSING: 'processing',
+            FEEDBACK_NO_SESSION: 'no_session',
 
             // 預設設定（優化後的值）
             DEFAULT_HEARTBEAT_FREQUENCY: 60000,  // 從 30 秒調整為 60 秒，減少網路負載

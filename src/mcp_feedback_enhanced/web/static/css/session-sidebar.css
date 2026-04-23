@@ -1,0 +1,391 @@
+/* ============================================================
+ * session-sidebar.css
+ * Phase 3 多會話外殼：左側會話列表 + 右側工作區
+ * ============================================================ */
+
+/* 整個 app-layout 佔滿視口高度，橫向 flex */
+.app-layout {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  min-height: 0; /* 讓內部子元素能正常 overflow */
+  width: 100%;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0; /* 防止 flex item 撐破容器 */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 讓 app-main 內部的 container 能正常滾動（而不是整個 body 滾動） */
+.app-main > .container {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ============================================================
+ * 側欄本體
+ * ============================================================ */
+
+.session-sidebar {
+  flex: 0 0 280px;
+  width: 280px;
+  max-width: 280px;
+  min-width: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: flex-basis 0.22s ease, width 0.22s ease;
+}
+
+.session-sidebar.collapsed {
+  flex: 0 0 0;
+  width: 0;
+  border-right: none;
+}
+
+.session-sidebar.collapsed > * {
+  display: none !important;
+}
+
+.sidebar-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+.sidebar-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.sidebar-stats-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-stats-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  text-align: center;
+  background: var(--surface-color);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.sidebar-stats-badge.waiting {
+  background: rgba(255, 152, 0, 0.18);
+  color: var(--warning-color);
+}
+
+.sidebar-stats-badge.active {
+  background: rgba(33, 150, 243, 0.18);
+  color: var(--info-color);
+}
+
+.sidebar-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.sidebar-action-btn {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-action-btn:hover {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+.sidebar-action-btn.sidebar-toggle {
+  flex: 0 0 32px;
+  max-width: 32px;
+}
+
+/* ============================================================
+ * 列表容器
+ * ============================================================ */
+
+.sidebar-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.sidebar-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 24px 8px;
+  font-size: 12px;
+}
+
+.sidebar-empty-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+/* i18n 翻譯通過 textContent 注入，`<br>` 會被轉成字面字串；為了讓
+   `empty` 翻譯裡的 \n 能被渲染成換行，這裡開啟 pre-line。 */
+.sidebar-empty-text {
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+/* ============================================================
+ * 單個會話卡片
+ * ============================================================ */
+
+.session-card {
+  position: relative;
+  padding: 8px 10px 8px 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-card:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.session-card.active {
+  background: rgba(0, 122, 204, 0.12);
+  border-color: var(--accent-color);
+  border-left-color: var(--accent-color);
+}
+
+.session-card.waiting {
+  border-left-color: var(--warning-color);
+}
+
+.session-card.waiting.pulse::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--warning-color);
+  border-radius: 50%;
+  animation: sidebar-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sidebar-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(1.6); }
+}
+
+.session-card.active-status {
+  border-left-color: var(--info-color);
+}
+
+.session-card.feedback-submitted {
+  border-left-color: var(--success-color);
+  opacity: 0.85;
+}
+
+.session-card.completed,
+.session-card.expired,
+.session-card.timeout,
+.session-card.canceled {
+  opacity: 0.55;
+  border-left-color: var(--text-secondary);
+}
+
+.session-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 16px; /* 給右上角的 pulse 留空間 */
+}
+
+.session-card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  align-items: center;
+}
+
+.session-card-id {
+  font-family: 'Menlo', 'Monaco', monospace;
+  opacity: 0.7;
+}
+
+.session-card-status {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-primary);
+}
+
+.session-card-status.waiting { color: var(--warning-color); background: rgba(255,152,0,.12); }
+.session-card-status.active  { color: var(--info-color);    background: rgba(33,150,243,.12); }
+.session-card-status.feedback_submitted { color: var(--success-color); background: rgba(76,175,80,.12); }
+.session-card-status.completed,
+.session-card-status.expired,
+.session-card-status.timeout,
+.session-card-status.canceled,
+.session-card-status.error {
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+}
+
+.session-card-summary {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
+  max-height: 2.7em;
+}
+
+.session-card-time {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.session-card-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.session-card:hover .session-card-actions {
+  opacity: 1;
+}
+
+.session-card-action-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 20px;
+  padding: 0;
+  text-align: center;
+}
+
+.session-card-action-btn:hover {
+  background: var(--error-color);
+  color: #fff;
+}
+
+/* ============================================================
+ * 展開按鈕（折疊狀態下的豎條，點擊展開）
+ * ============================================================ */
+
+.sidebar-reopen-btn {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 56px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-reopen-btn:hover {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+/* ============================================================
+ * 響應式：小螢幕時側欄變成抽屜（覆蓋模式）
+ * ============================================================ */
+
+@media (max-width: 768px) {
+  .session-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 999;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+  }
+
+  .session-sidebar.collapsed {
+    transform: translateX(-100%);
+  }
+}

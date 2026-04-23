@@ -248,6 +248,11 @@
                     button.className = 'btn btn-success';
                     button.disabled = true;
                     break;
+                case Utils.CONSTANTS.FEEDBACK_NO_SESSION:
+                    button.textContent = window.i18nManager ? window.i18nManager.t('buttons.submit') : '提交回饋';
+                    button.className = 'btn btn-secondary';
+                    button.disabled = true;
+                    break;
             }
         });
     };

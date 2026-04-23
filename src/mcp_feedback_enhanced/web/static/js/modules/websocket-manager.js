@@ -263,10 +263,112 @@
     };
 
     /**
+     * Phase 3: 將後端事件餵給多會話 Store（如果已加載）
+     * 注意：此函數只更新 Store，不影響原有的 processMessage 控制流。
+     */
+    WebSocketManager.prototype._updateStore = function(data) {
+        var store = window.MCPFeedback && window.MCPFeedback.sessionStore;
+        if (!store || !data) return;
+
+        try {
+            switch (data.type) {
+                case 'sessions_snapshot':
+                    store.applySnapshot(
+                        Array.isArray(data.sessions) ? data.sessions : [],
+                        data.active_session_id || null
+                    );
+                    break;
+
+                case 'session_created':
+                    if (data.session && data.session.session_id) {
+                        var newRec = data.session;
+                        var prevActive = store.getActiveSessionId();
+                        // 如果用戶當前正在看別的 session，給新 session 打上 pending
+                        // 標記，讓側欄小黃點 + title 計數能正確反映「你還有新會話」。
+                        if (prevActive && prevActive !== newRec.session_id) {
+                            newRec = Object.assign({}, newRec, {
+                                has_pending_notification: true
+                            });
+                        }
+                        store.upsertSession(newRec);
+                    }
+                    break;
+
+                case 'session_updated':
+                    if (data.session && data.session.session_id) {
+                        store.upsertSession(data.session);
+                    } else if (data.session_info && data.session_info.session_id) {
+                        store.patchSession(data.session_info.session_id, {
+                            project_directory: data.session_info.project_directory,
+                            summary: data.session_info.summary,
+                            status: data.session_info.status,
+                            last_activity: Date.now()
+                        });
+                    } else if (data.session_id) {
+                        store.patchSession(data.session_id, {
+                            status: data.status,
+                            status_message: data.status_message,
+                            title: data.title,
+                            last_activity: data.last_activity
+                        });
+                    }
+                    break;
+
+                case 'session_archived':
+                case 'session_removed':
+                    if (data.session_id) store.removeSession(data.session_id);
+                    break;
+
+                case 'session_expired':
+                    if (data.session_id) {
+                        store.patchSession(data.session_id, {
+                            status: data.status || 'expired',
+                            last_activity: Date.now()
+                        });
+                    }
+                    break;
+
+                case 'session_feedback_submitted':
+                    if (data.session_id) {
+                        store.patchSession(data.session_id, {
+                            status: 'feedback_submitted',
+                            feedback_completed: true,
+                            last_activity: Date.now()
+                        });
+                    }
+                    break;
+
+                case 'status_update':
+                    if (data.status_info && data.status_info.session_id) {
+                        var s = data.status_info;
+                        store.patchSession(s.session_id, {
+                            status: s.status,
+                            status_message: s.message || '',
+                            last_activity: Date.now()
+                        });
+                    }
+                    break;
+
+                case 'notification':
+                    if (data.session_id && store.getActiveSessionId() !== data.session_id) {
+                        store.patchSession(data.session_id, {
+                            has_pending_notification: true
+                        });
+                    }
+                    break;
+            }
+        } catch (e) {
+            console.warn('_updateStore 失敗:', e);
+        }
+    };
+
+    /**
      * 處理訊息
      */
     WebSocketManager.prototype.processMessage = function(data) {
         console.log('收到 WebSocket 訊息:', data);
+
+        this._updateStore(data);
 
         switch (data.type) {
             case 'connection_established':
@@ -357,6 +459,39 @@
         this.send({
             type: 'get_status'
         });
+    };
+
+    /**
+     * Phase 3: 帶上指定 session_id 發送消息
+     */
+    WebSocketManager.prototype.sendTo = function(sessionId, data) {
+        if (!data) return false;
+        var payload = Object.assign({}, data);
+        if (sessionId) payload.session_id = sessionId;
+        return this.send(payload);
+    };
+
+    /**
+     * Phase 3: 將消息發給當前 active session（從 Store 讀取）
+     */
+    WebSocketManager.prototype.sendToActive = function(data) {
+        var store = window.MCPFeedback && window.MCPFeedback.sessionStore;
+        var sid = store ? store.getActiveSessionId() : null;
+        return this.sendTo(sid, data);
+    };
+
+    /**
+     * Phase 3: 通過 WS 歸檔指定會話
+     */
+    WebSocketManager.prototype.archiveSession = function(sessionId) {
+        return this.sendTo(sessionId, { type: 'archive_session' });
+    };
+
+    /**
+     * Phase 3: 主動請求最新快照
+     */
+    WebSocketManager.prototype.requestSessionsSnapshot = function() {
+        return this.send({ type: 'get_sessions_snapshot' });
     };
 
     /**

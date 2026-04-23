@@ -189,6 +189,27 @@
             "message": "会话已完成"
         }
     },
+    "sessionStatus": {
+        "waiting": "等待中",
+        "active": "进行中",
+        "feedback_submitted": "已提交",
+        "completed": "已完成",
+        "expired": "已过期",
+        "timeout": "已超时",
+        "canceled": "已取消",
+        "error": "错误"
+    },
+    "sessionList": {
+        "title": "会话列表",
+        "waiting": "等待",
+        "active": "进行中",
+        "clearDone": "清除所有已完成的会话",
+        "clearDoneLabel": "清除已完成",
+        "collapse": "收起侧栏",
+        "expand": "展开侧栏",
+        "archive": "归档此会话",
+        "empty": "尚无会话\n等待 MCP 调用中..."
+    },
     "notifications": {
         "feedback_sent": "反馈已发送",
         "command_executed": "命令已执行",
@@ -365,7 +386,6 @@
             "reconnects": "重连"
         }
     },
-
     "dynamic": {
         "aiSummary": "测试 Web UI 功能\n\n🎯 **功能测试项目：**\n- Web UI 服务器启动和运行\n- WebSocket 实时通讯\n- 反馈提交功能\n- 图片上传和预览\n- 命令执行功能\n- 智能 Ctrl+V 图片粘贴\n- 多语言界面功能\n\n📋 **测试步骤：**\n1. 测试图片上传（拖拽、选择文件、剪贴板）\n2. 在文本框内按 Ctrl+V 测试智能粘贴\n3. 尝试切换语言（繁中/简中/英文）\n4. 测试命令执行功能\n5. 提交反馈和图片\n\n请测试这些功能并提供反馈！",
         "terminalWelcome": "欢迎使用交互反馈终端\n========================================\n项目目录: {sessionId}\n输入命令后按 Enter 或点击执行按钮\n支持的命令: ls, dir, pwd, cat, type 等\n\n$ "

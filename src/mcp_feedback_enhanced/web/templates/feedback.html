@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="/static/icon.svg">
 
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/session-sidebar.css">
     <link rel="stylesheet" href="/static/css/session-management.css">
     <link rel="stylesheet" href="/static/css/prompt-management.css">
     <link rel="stylesheet" href="/static/css/audio-management.css">
@@ -397,6 +398,65 @@
     </style>
 </head>
 <body class="layout-{{ layout_mode }}">
+    <!-- ===== 多會話應用外殼 (Phase 3) =====
+         左側：會話列表側欄（由 session-sidebar.js 接管渲染）
+         右側：原有頂欄 + 工作區
+    -->
+    <div class="app-layout" id="appLayout">
+        <aside class="session-sidebar" id="sessionSidebar" aria-label="會話列表">
+            <div class="sidebar-header">
+                <div class="sidebar-title" data-i18n="sessionList.title">會話列表</div>
+                <div class="sidebar-stats">
+                    <span class="sidebar-stats-item">
+                        <span data-i18n="sessionList.waiting">等待</span>:
+                        <span id="sidebarWaitingCount" class="sidebar-stats-badge waiting">0</span>
+                    </span>
+                    <span class="sidebar-stats-item">
+                        <span data-i18n="sessionList.active">進行中</span>:
+                        <span id="sidebarActiveCount" class="sidebar-stats-badge active">0</span>
+                    </span>
+                </div>
+                <div class="sidebar-actions">
+                    <button type="button"
+                            id="sidebarClearDoneBtn"
+                            class="sidebar-action-btn"
+                            data-i18n-title="sessionList.clearDone"
+                            title="清除已完成">
+                        🧹 <span data-i18n="sessionList.clearDoneLabel">清除已完成</span>
+                    </button>
+                    <button type="button"
+                            id="sidebarToggleBtn"
+                            class="sidebar-action-btn sidebar-toggle"
+                            data-i18n-title="sessionList.collapse"
+                            title="收起側欄"
+                            aria-controls="sessionSidebar">
+                        ◀
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-list" id="sessionSidebarList" role="list">
+                <!-- 空態占位：沒有會話時顯示 -->
+                <div class="sidebar-empty" id="sidebarEmpty">
+                    <div class="sidebar-empty-icon">💭</div>
+                    <div class="sidebar-empty-text" data-i18n="sessionList.empty">
+                        尚無會話<br>等待 MCP 調用中...
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 折疊狀態下的迷你邊條，點擊即可展開 -->
+        <button type="button"
+                id="sidebarReopenBtn"
+                class="sidebar-reopen-btn"
+                aria-controls="sessionSidebar"
+                data-i18n-title="sessionList.expand"
+                title="展開側欄"
+                style="display:none;">
+            ▶
+        </button>
+
+        <div class="app-main" id="appMain">
     <!-- ===== 頂部連線監控狀態列（緊湊版） ===== -->
     <div class="connection-monitor-bar compact">
         <!-- 標題 -->
@@ -1166,6 +1226,8 @@
 
 
     </div>
+        </div> <!-- /app-main -->
+    </div> <!-- /app-layout -->
 
     <!-- WebSocket 和 JavaScript -->
     <!-- Markdown 支援庫 - 本地版本 -->
@@ -1180,6 +1242,9 @@
     <script src="/static/js/modules/utils/dom-utils.js?v=2025010510"></script>
     <script src="/static/js/modules/utils/time-utils.js?v=2025010510"></script>
     <script src="/static/js/modules/utils/status-utils.js?v=2025010510"></script>
+
+    <!-- 多會話 Store（Phase 3）- 必須在其它會話模組之前 -->
+    <script src="/static/js/modules/session-store.js?v=2025010510"></script>
 
     <!-- 會話管理模組 -->
     <script src="/static/js/modules/session/session-data-manager.js?v=2025010510"></script>
@@ -1201,19 +1266,23 @@
     <script src="/static/js/modules/notification/notification-settings.js?v=2025010510"></script>
 
     <!-- 其他模組 -->
-    <script src="/static/js/modules/utils.js?v=2025010510"></script>
+    <script src="/static/js/modules/utils.js?v=2025010515"></script>
     <script src="/static/js/modules/tab-manager.js?v=2025010510"></script>
-    <script src="/static/js/modules/websocket-manager.js?v=2025010510"></script>
+    <script src="/static/js/modules/websocket-manager.js?v=2025010516"></script>
     <script src="/static/js/modules/connection-monitor.js?v=2025010510"></script>
     <script src="/static/js/modules/session-manager.js?v=2025010510"></script>
+    <!-- 多會話側欄（Phase 3） -->
+    <script src="/static/js/modules/session-sidebar.js?v=2025010515"></script>
+    <!-- 多會話通知徽章（title 計數 + favicon 小紅點 + 系統通知 + Cmd/Ctrl+1..9） -->
+    <script src="/static/js/modules/notify-badge.js?v=2025010516"></script>
     <script src="/static/js/modules/file-upload-manager.js?v=2025010510"></script>
     <script src="/static/js/modules/image-handler.js?v=2025010510"></script>
     <script src="/static/js/modules/settings-manager.js?v=2025010510"></script>
-    <script src="/static/js/modules/ui-manager.js?v=2025010510"></script>
+    <script src="/static/js/modules/ui-manager.js?v=2025010515"></script>
     <script src="/static/js/modules/textarea-height-manager.js?v=2025010510"></script>
 
     <!-- 主應用程式 -->
-    <script src="/static/js/app.js?v=2025010510"></script>
+    <script src="/static/js/app.js?v=2025010516"></script>
     <script>
         // 等待所有模組載入完成後再初始化 FeedbackApp
         async function initializeApp() {

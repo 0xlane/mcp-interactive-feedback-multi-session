@@ -73,13 +73,18 @@
      */
     ConnectionMonitor.prototype.startMonitoring = function() {
         if (this.isMonitoring) return;
-        
+
         this.isMonitoring = true;
         this.connectionStartTime = Date.now();
         this.reconnectCount = 0;
         this.messageCount = 0;
         this.latencyHistory = [];
-        
+
+        // 連線時間 + 會話數/狀態這些值若只靠 pong/message 觸發 updateDisplay，
+        // 在空閒或心跳頻率低（60s）時卡片就會長時間定格。這裡用 1s 輕量 tick
+        // 保證 UI 會持續前進；回調只寫 DOM，不發網路請求。
+        this._startDisplayTicker();
+
         console.log('🔍 開始連線監控');
         this.updateDisplay();
     };
@@ -91,9 +96,26 @@
         this.isMonitoring = false;
         this.connectionStartTime = null;
         this.lastPingTime = null;
-        
+        this._stopDisplayTicker();
+
         console.log('🔍 停止連線監控');
         this.updateDisplay();
+    };
+
+    ConnectionMonitor.prototype._startDisplayTicker = function() {
+        if (this._displayTickerId) return;
+        var self = this;
+        this._displayTickerId = setInterval(function() {
+            if (!self.isMonitoring) return;
+            self.updateDisplay();
+        }, 1000);
+    };
+
+    ConnectionMonitor.prototype._stopDisplayTicker = function() {
+        if (this._displayTickerId) {
+            clearInterval(this._displayTickerId);
+            this._displayTickerId = null;
+        }
     };
 
     /**
@@ -373,16 +395,53 @@
         }
         
         // 更新統計面板中的會話數和狀態
-        const sessionCount = document.getElementById('sessionCount');
+        // Phase 3 之後舊的 #sessionCount / #sessionStatusText 元素已隨 UI 重構
+        // 一起被移除，原本從 DOM 拷文字的寫法永遠讀不到值，統計面板就永遠停留在
+        // HTML 初始硬編碼的 "1" / "等待中"，即便側欄已經清空也不會變。
+        // 這裡改為直接讀 sessionStore 作為單一資料源，並補上 i18n 對應。
+        var store = window.MCPFeedback && window.MCPFeedback.sessionStore;
         const statsSessionCount = document.getElementById('statsSessionCount');
-        if (sessionCount && statsSessionCount) {
-            statsSessionCount.textContent = sessionCount.textContent;
+        if (statsSessionCount) {
+            if (store && typeof store.getSessions === 'function') {
+                statsSessionCount.textContent = String(store.getSessions().length);
+            } else {
+                statsSessionCount.textContent = '0';
+            }
         }
-        
-        const sessionStatusText = document.getElementById('sessionStatusText');
+
         const statsSessionStatus = document.getElementById('statsSessionStatus');
-        if (sessionStatusText && statsSessionStatus) {
-            statsSessionStatus.textContent = sessionStatusText.textContent;
+        if (statsSessionStatus) {
+            var statusText;
+            var statusI18nKey = null;
+            var activeSession = null;
+            if (store && typeof store.getActiveSessionId === 'function') {
+                var aid = store.getActiveSessionId();
+                if (aid && typeof store.getSession === 'function') {
+                    activeSession = store.getSession(aid);
+                }
+            }
+            if (activeSession && activeSession.status) {
+                statusI18nKey = 'sessionStatus.' + activeSession.status;
+                var mgr = window.i18nManager;
+                statusText = (mgr && typeof mgr.t === 'function')
+                    ? mgr.t(statusI18nKey)
+                    : activeSession.status;
+                if (statusText === statusI18nKey) {
+                    // i18n 鍵未命中，退回原始狀態字串
+                    statusText = activeSession.status;
+                }
+            } else {
+                statusI18nKey = 'connectionMonitor.noActiveSession';
+                var mgr2 = window.i18nManager;
+                statusText = (mgr2 && typeof mgr2.t === 'function')
+                    ? mgr2.t(statusI18nKey)
+                    : '無活躍會話';
+                if (statusText === statusI18nKey) statusText = '無活躍會話';
+            }
+            statsSessionStatus.textContent = statusText;
+            if (statusI18nKey) {
+                statsSessionStatus.setAttribute('data-i18n', statusI18nKey);
+            }
         }
     };
 

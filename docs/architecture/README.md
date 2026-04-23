@@ -1,5 +1,20 @@
 # MCP Feedback Enhanced 架構文檔
 
+> ## 🚧 v3.0 重構進行中：單守護 + HTTP 多會話架構
+>
+> - **v2.x 架構**（"單活躍會話 + stdio MCP + 每進程一端口"）正在被取代；
+> - **v3.0 目標**：一個本地 daemon，所有 AI Agent 通過 HTTP 連入，一個
+>   瀏覽器 Tab 聚合所有並行的 `interactive_feedback` 請求；
+> - **當前進度**：阶段 1 / 2 / 3 已完成（後端多會話 + HTTP daemon +
+>   雙欄 UI）；阶段 4 / 5 收尾中；
+> - 若你現在在使用本倉庫，請先閱讀：
+>   - [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md)（總體設計 + 經驗教訓）
+>   - [阶段 2：HTTP Daemon 使用指南](./phase2-http-daemon-usage.md)（啟動 + `mcp.json` 改造）
+>   - [阶段 3：雙欄多會話 UI 使用指南](./phase3-multi-session-ui-usage.md)（界面導覽 + 快捷鍵 + 粘滯 active 語義）
+>
+> 本 README 其餘部分（「架構概覽」「v2.4.3 版本亮點」等小節）是 v2.x
+> 的歷史狀態，升級完成後會被改寫。
+
 ## 📋 文檔索引
 
 本目錄包含 MCP Feedback Enhanced 專案的完整架構文檔，提供深入的技術分析和設計說明。
@@ -8,21 +23,27 @@
 
 | 文檔 | 描述 | 適用對象 |
 |------|------|----------|
-| [系統架構總覽](./system-overview.md) | 整體架構設計、核心概念和技術亮點 | 架構師、技術負責人 |
-| [組件詳細說明](./component-details.md) | 各層級組件的詳細功能和實現 | 開發人員、維護人員 |
-| [交互流程文檔](./interaction-flows.md) | AI 助手與 MCP 服務的完整交互流程 | 集成開發人員 |
-| [API 參考文檔](./api-reference.md) | MCP 工具接口和 WebSocket API 規範 | API 使用者、前端開發 |
-| [部署指南](./deployment-guide.md) | 環境配置、部署選項和故障排除 | 運維人員、系統管理員 |
-| [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) 🚧 | 由 stdio 單會話轉為 HTTP 單守護多會話的設計提案（v3.0.0 規劃） | 架構師、核心開發 |
-| [階段 2 HTTP Daemon 使用指南](./phase2-http-daemon-usage.md) 🆕 | `uvx serve --http` 啟動、`mcp.json` 改造、端點清單 | 早期使用者、開發者 |
+| [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) ⭐ | v3.0 總體設計、分階段路線圖、經驗教訓（最新） | 架構師、核心開發 |
+| [阶段 2：HTTP Daemon 使用指南](./phase2-http-daemon-usage.md) 🆕 | `uvx serve --http` 啟動、`mcp.json` 改造、端點清單 | 早期使用者、開發者 |
+| [阶段 3：雙欄多會話 UI 使用指南](./phase3-multi-session-ui-usage.md) 🆕 | 雙欄 UI / 快捷鍵 / 草稿 / 粘滯 active / 歸檔語義 | 日常使用者、核心開發 |
+| [系統架構總覽](./system-overview.md) | 整體架構設計、核心概念和技術亮點（v2.x 歷史） | 架構師、技術負責人 |
+| [組件詳細說明](./component-details.md) | 各層級組件的詳細功能和實現（v2.x 歷史） | 開發人員、維護人員 |
+| [交互流程文檔](./interaction-flows.md) | AI 助手與 MCP 服務的完整交互流程（v2.x 歷史） | 集成開發人員 |
+| [API 參考文檔](./api-reference.md) | MCP 工具接口和 WebSocket API 規範（v2.x 歷史） | API 使用者、前端開發 |
+| [部署指南](./deployment-guide.md) | 環境配置、部署選項和故障排除（v2.x 歷史） | 運維人員、系統管理員 |
 
 ### 🏗️ 架構概覽
 
-MCP Feedback Enhanced 採用**單一活躍會話 + 持久化 Web UI**的創新架構，實現了 AI 助手與用戶之間的無縫交互體驗。
+> 以下為 **v2.x 歷史架構**描述。v3.0 目標架構請見
+> [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) §3。
 
-#### 核心特性
+MCP Feedback Enhanced（v2.x 時期）採用**單一活躍會話 + 持久化 Web UI**的架構，
+實現了 AI 助手與用戶之間的無縫交互體驗。
+
+#### 核心特性（v2.x 歷史）
 - **智能環境檢測**: 自動識別 Local/SSH Remote/WSL 環境
-- **單一活躍會話**: 替代傳統多會話管理，提升性能和用戶體驗
+- **單一活躍會話**: ~~替代傳統多會話管理，提升性能和用戶體驗~~
+  🚫 **v3.0 已移除**，改為單 daemon + 多會話并存（見 phase3 使用指南）
 - **持久化 Web UI**: 支援多次循環調用，無需重複開啟瀏覽器
 - **實時雙向通信**: WebSocket 實現前後端狀態同步
 - **智能資源管理**: 自動清理和會話生命週期管理
@@ -42,10 +63,16 @@ MCP Feedback Enhanced 採用**單一活躍會話 + 持久化 Web UI**的創新�
 
 ### 🎯 快速導航
 
-- **新手入門**: 從 [系統架構總覽](./system-overview.md) 開始
-- **深入理解**: 閱讀 [組件詳細說明](./component-details.md)
-- **集成開發**: 參考 [交互流程文檔](./interaction-flows.md) 和 [API 參考文檔](./api-reference.md)
-- **部署運維**: 查看 [部署指南](./deployment-guide.md)
+- **v3.0 使用（推薦）**：
+  - 啟動 daemon → [阶段 2 使用指南](./phase2-http-daemon-usage.md)
+  - 瀏覽器多會話操作 → [阶段 3 UI 使用指南](./phase3-multi-session-ui-usage.md)
+  - 設計背景與經驗教訓 → [重構設計](./multi-session-http-redesign.md)
+- **v2.x 歷史資料**：
+  - 單會話架構 → [系統架構總覽](./system-overview.md)
+  - 組件細節 → [組件詳細說明](./component-details.md)
+  - 交互流程 → [交互流程文檔](./interaction-flows.md)
+  - API（含仍生效的部分） → [API 參考文檔](./api-reference.md)
+  - 部署（仍適用） → [部署指南](./deployment-guide.md)
 
 ### 📊 架構圖表
 
@@ -83,10 +110,10 @@ MCP Feedback Enhanced 採用**單一活躍會話 + 持久化 Web UI**的創新�
 
 ---
 
-**版本**: 2.4.3
-**最後更新**: 2025年6月14日
-**維護者**: Minidoracat
-**架構類型**: Web-Only 四層架構
-**v2.4.3 新功能**: 音效通知系統、會話管理重構、智能記憶功能、一鍵複製
-**歷史功能**: 提示詞管理、自動提交、會話管理、語系切換優化
-**文檔狀態**: ✅ 已完成 v2.4.3 全面更新，包含所有新功能的詳細說明和架構分析
+**當前版本**: v3.0.0-dev（multi-session-http 重構中）
+**v2.x 文檔版本**: 2.4.3（2025年6月14日）
+**最後更新**: 2026-04-22（Phase 3 雙欄 UI 落地 + 粘滯 active 修復）
+**架構類型**: v3.0 單 Daemon + FastAPI + FastMCP HTTP + 雙欄 SPA 多會話 UI
+**v3.0 新功能**: 多會話并存、粘滯活躍指針、每會話獨立草稿、Title/Favicon 徽標、`Cmd/Ctrl+1..9` 快捷鍵、批量歸檔
+**v2.x 歷史功能**: 單一活躍會話、提示詞管理、自動提交、會話管理、音效通知、智能記憶
+**文檔狀態**: 🚧 阶段 1/2/3 已落地；阶段 4/5 收尾中；v2.x 子文檔（system-overview / component-details 等）待 v3.0 穩定後統一重寫

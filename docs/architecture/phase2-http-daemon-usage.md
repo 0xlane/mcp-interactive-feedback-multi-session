@@ -87,8 +87,10 @@ Daemon 启动后对外开放：
 3. 修改 `~/.cursor/mcp.json` 如上；
 4. 在 Cursor 发起一次 `interactive_feedback` 调用 —— 会话出现在浏览器里；
 5. 再起第二个 Chat 并发调用 —— 会话被追加到同一个浏览器页面。
-   > ⚠️ 阶段 2 的 UI 仍是「单活跃视图」：新会话会挤掉旧会话的显示，但旧会话在后端仍然活着。
-   > 双栏 UI（侧栏 + 详情）在阶段 3 落地。
+   > ✅ 阶段 3 落地后，新会话不再挤掉旧会话显示：侧栏列出全部并行
+   > 会话，你保持在当前会话里不被打断，新会话通过红点 + `(N)` 标题
+   > 前缀 + 桌面通知提示。详见
+   > [phase3-multi-session-ui-usage.md](./phase3-multi-session-ui-usage.md)。
 
 ## 5. 常见问题
 
@@ -110,7 +112,13 @@ A：`uvx mcp-feedback-enhanced serve --http --port 18765`，同步改 `mcp.json`
 
 ## 6. 已知限制（阶段 2）
 
-- Web UI 视觉层仍为「单活跃会话」，多会话的侧栏切换体验在阶段 3 交付；
-- 归档仅能通过 `POST /api/sessions/{id}/archive` API 调用，尚无前端按钮（阶段 4）；
+> ✅ 表示阶段 3 已解决，仍属于阶段 2 文档范畴的限制以原文保留。
+
+- ~~Web UI 视觉层仍为「单活跃会话」，多会话的侧栏切换体验在阶段 3 交付~~；
+  ✅ 阶段 3 已交付雙栏 UI，参见
+  [phase3-multi-session-ui-usage.md](./phase3-multi-session-ui-usage.md)。
+- ~~归档仅能通过 `POST /api/sessions/{id}/archive` API 调用，尚无前端按钮（阶段 4）~~；
+  ✅ 阶段 3 已在侧栏卡片右上角提供 `[X]` 归档按钮 + 批量「清除已完成」
+  按钮（底层仍可走 REST API，方便自动化脚本）。
 - 不提供 LaunchAgent / systemd 模板，需用户自行管理前台进程；
 - Tauri 桌面模式暂停维护，仅支持浏览器。

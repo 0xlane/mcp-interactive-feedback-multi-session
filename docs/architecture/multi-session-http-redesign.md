@@ -1,10 +1,12 @@
 # 多会话 HTTP 模式重构设计
 
-> **状态**：阶段 2 已完成；阶段 3（前端双栏 UI）待开工
+> **状态**：阶段 1 / 阶段 2 / 阶段 3 全部完成；阶段 4 / 5 持续收尾中
 > **创建日期**：2026-04-22
-> **最后更新**：2026-04-22（阶段 2 实施完成：HTTP daemon + PID 锁 + mcp.http_app 挂载 + `serve` 子命令）
+> **最后更新**：2026-04-22（阶段 3 实施完成：WS 多路复用 + 双栏 UI + 粘滞 active 指针 + 跨会话串线修复）
 > **涉及范围**：MCP 传输层、Web UI 管理层、前端交互层
 > **预期版本**：v3.0.0（**破坏性变更**：完全移除 stdio 模式，不保留兜底）
+>
+> 阶段 3 相关使用文档：[phase3-multi-session-ui-usage.md](./phase3-multi-session-ui-usage.md)
 
 ## 1. 背景
 
@@ -467,14 +469,125 @@ mcp-interactive-feedback serve --http
 pre-existing failure（与 `main` baseline 完全一致），Phase 2 新加的 33 个
 test 全过，没有引入新回归。
 
-### 阶段 3：前端双栏 UI
+### 阶段 3：前端双栏 UI ✅ 已完成
 
-- `SessionSidebar` + `SessionDetailPane` 组件；
-- WS 多路复用接线；
-- 每会话草稿/命令输出隔离；
-- Title / favicon / 音效 / 通知徽标。
+**落地清单**：
 
-**验收**：一个 Tab 内能流畅切换多个会话、看到等待中提示。
+- ✅ 新增 `session-store.js`：会话集中式状态 + 订阅事件
+  （`ACTIVE_CHANGED` / `SESSION_ADDED` / `SESSION_UPDATED` / `SESSION_REMOVED`
+  / `SNAPSHOT_APPLIED`），对外只读；`upsertSession` 只在「当前无活跃会话」
+  时才自动激活新会话，呼应粘滞语义；
+- ✅ 新增 `session-sidebar.js` + `session-sidebar.css`：按创建时间
+  降序渲染会话卡片，支持 `WAITING` 脉动动画、`pending` 小红点、归档按钮、
+  侧栏折叠（`localStorage` 持久化）；点击卡片发 `ACTIVE_CHANGED` 并触发
+  `set_active_session` 告知后端；
+- ✅ 新增 `notify-badge.js`：`document.title` 前缀 `(N)` + Canvas 生成
+  favicon 红点 + 浏览器 Desktop Notification（全部可选）；`Cmd/Ctrl+1..9`
+  按侧栏相同顺序跳到第 N 个会话；`MutationObserver` 保护 `(N)` 前缀不被
+  其他代码（如 `refreshPageContent`）意外抹掉；
+- ✅ 改造 `websocket-manager.js`：事件按 `session_id` 路由进 store，
+  `session_created` 事件当用户正在看别的会话时给新会话打
+  `has_pending_notification` 标记，由侧栏转为红点 + 通知；
+- ✅ 改造 `app.js`：
+  - `_drafts` 每会话独立草稿，切会话自动保存 + 恢复 textarea 内容；
+  - `applyActiveSessionToUI` 向后端发 `set_active_session`，保证
+    `sessions_snapshot.is_current` 与 `/api/current-session` 跟随前端视图；
+  - `_renderEmptyState` 无 active 会话时显示友好占位 + 禁用表单；
+  - `_syncFeedbackStateToSession` 把 `WAITING` / `FEEDBACK_SUBMITTED` /
+    终态映射到 `uiManager.feedbackState`，使提交按钮 / 输入框 / 图片上传
+    区域的禁用状态与会话真实状态一致；
+  - `SESSION_UPDATED` 只在更新的是当前活跃会话时才刷新表单，避免后台会话
+    状态变化打断用户编辑；
+- ✅ 后端对应接口（`src/.../web/routes/main_routes.py`）：
+  - `/` 路由不再根据 `current_session` 分支返回 `index.html`/`feedback.html`，
+    而是始终返回 `feedback.html` SPA 壳，内容由前端通过 `/api/sessions`
+    + WS `sessions_snapshot` 事件拉取；
+  - WebSocket 新增 `set_active_session` 消息类型，用户点击侧栏卡片时同步
+    后端 `_active_session_id`；
+- ✅ 后端 `WebUIManager.create_session` 改为「粘滞活跃指针」：新会话到达
+  时**不**强行把 `_active_session_id` 切到新会话，只有在当前无活跃或活跃
+  指针失效时才自动激活；前端需要显示新会话要通过侧栏点击或 `Cmd+1..9`
+  主动切换（见下文「经验教训」）；
+- ✅ 后端 `WebUIManager.cancel_session` 改为真正从 `self.sessions`
+  字典中 pop（而不是只标记 UI 隐藏），避免「清除已完成 → 刷新后又回来」
+  的 UX bug；
+- ✅ 后端 `build_sessions_snapshot` 使用 `_creation_seq` 作为同毫秒内
+  tie-breaker，保证侧栏顺序在高频创建下稳定；
+- ✅ i18n（`zh-CN` / `zh-TW` / `en`）补齐 `sessionList.*` 和
+  `sessionStatus.*` 两个命名空间，覆盖侧栏、空态、已提交只读、清除按钮
+  等新文案；
+- ✅ 开发辅助脚本 `scripts/dev_sim_feedback.py`：在无 Cursor IDE 的情况
+  下用真实 MCP HTTP transport 发起 `interactive_feedback` 调用，用于手工
+  验证多会话 UI；支持 `--timeout`（默认 1800s）便于长时间手测；
+- ✅ 测试：5 个历史测试文件更新匹配粘滞语义，新增 1 个回归测试
+  `test_session_lookup_by_id_after_sticky_active` 守跨会话串线；放宽
+  `test_startup_performance` 阈值避免 suite 满载下假阳；全量 196 个
+  pytest 测试绿。
+
+**验收**：一个浏览器 Tab 内能流畅切换多个会话、红点/通知反映等待状态、
+切换时各自草稿不丢失、提交一个会话不会误解锁其他会话的 `wait_for_feedback`。
+用 `scripts/dev_sim_feedback.py` 启两个并发 MCP 调用并分别提交反馈验证：
+两个 agent 拿到的是**各自的**反馈。
+
+#### Phase 3 实际落地差异与经验教训
+
+1. **粘滞活跃指针**（偏离原设计）
+   - 原设计中 `_active_session_id` 概念被写进「4.1 需要删除」清单，意图
+     完全去除 current 概念。实际落地时保留了 `_active_session_id`，但
+     语义从「最新创建的」改成「前端当前在看的」：
+     - `create_session` 只在当前无有效 active 时才自动激活新会话；
+     - `set_active_session` WS 消息由前端点击侧栏时下发；
+     - `/api/current-session` 返回的是「用户视角」而非「最新」。
+   - 原因：完全去除 current 会导致后端所有 `wait_for_feedback` 逻辑都
+     要通过 `session_id` 参数显式传递，改动面过大且容易引入新 bug（见
+     第 2 点），保留一个「视图焦点指针」反而更稳，也更符合用户心智
+     （一个 Tab 总有一个「当前会话」的视觉焦点）。
+
+2. **跨会话反馈串线 bug**（调试中发现）
+   - 引入粘滞语义之后 `launch_web_feedback_ui` 里原本的
+     `session = manager.get_current_session()` 就出 bug：创建了新
+     session B，但 `get_current_session()` 仍返回旧 A（因为粘滞没
+     切过去），于是 B 的 `wait_for_feedback` 实际在等 A 的
+     `feedback_completed`，用户只要提交一次 A 的反馈，A / B 两个
+     agent 都会被解锁并拿到**同一份**反馈。
+   - 修复：`launch_web_feedback_ui` 改为 `manager.get_session(session_id)`
+     精确按 ID 定位；并且新增专门的回归测试
+     `test_session_lookup_by_id_after_sticky_active` 守这条线。
+   - 教训：任何「把单例语义改成多元语义」的改动都要扫一遍全量
+     `get_current_session()` / `current_session` 调用点，不能依赖类型
+     系统发现问题。
+
+3. **归档语义需要真的从字典删除**（调试中发现）
+   - 原设计 4.1 计划保留「UI 层归档」选项。实际上保留 UI 层归档会导致
+     刷新页面时 `sessions_snapshot` 把已归档的会话重新推回侧栏，用户
+     看到「清除完成 → 刷新 → 又回来了」的恶性循环。
+   - 修复：`cancel_session` 无论会话处于什么状态，都同步
+     `session.cleanup() + self.sessions.pop(...)`，并把活跃指针让给
+     下一个非终态会话。
+
+4. **事件广播替代 WS 转移**（改动扩散）
+   - 原设计 4.1 要求删除「旧会话 WebSocket 转给新会话」的兼容逻辑。
+     实际落地时不仅删了这个 hand-off，也删掉了 daemon 模式里
+     `notify_existing_tab_to_refresh` 的调用路径——该方法是从
+     `current_session.websocket` 出去的，与新的 `manager.broadcast`
+     广播机制冲突，而且 `launch_web_feedback_ui` 已经在前面发了
+     `session_created` 广播，再走 refresh 通知就是重复且会打乱
+     前端状态机。最终 daemon 分支只保留一次 `broadcast` + 日志
+     打印连接数。
+
+5. **`Cmd+1..9` 必须跟侧栏同序**（E2E 验证中发现）
+   - 早期实现按后端原生 sessions dict 顺序给快捷键编号，结果用户看到
+     侧栏第 1 位是 A，但 `Cmd+1` 跳到的是 B（按字典插入时间升序）。
+   - 修复：`notify-badge.js` 里 `setupShortcuts` 先对 sessions 按
+     `created_at` **降序**排序后再做 0..8 → `Cmd+1..9` 的映射，和侧栏
+     默认渲染顺序完全一致。
+
+6. **cache buster 常态化**
+   - 开发期间反复修 app.js / websocket-manager / session-sidebar 等，
+     `feedback.html` 里所有 `?v=YYYYMMDDNN` 参数都要同步 bump，否则
+     daemon 已启动的用户旧会话里的浏览器 Tab 会拉到旧 JS。最终选择
+     每次改动相关 JS 时同时 bump 对应模块的版本号（见 commit
+     `feat(web): Phase 3 frontend dual-pane multi-session UI`）。
 
 ### 阶段 4：归档与清理语义
 
@@ -525,18 +638,30 @@ test 全过，没有引入新回归。
 
 ## 附录 A：关键文件导航
 
-| 文件 | 现有职责 | 改造重点 |
+> 「落地状态」一列为阶段 1/2/3 完成后的最终形态。
+
+| 文件 | 职责 | 落地状态 |
 |---|---|---|
-| `src/mcp_feedback_enhanced/server.py` | MCP 服务器入口、`interactive_feedback` tool | 切换 transport；与 FastAPI 合并 |
-| `src/mcp_feedback_enhanced/web/main.py` | `WebUIManager` 单例 | 删除 `current_session`；改造 `create_session` |
-| `src/mcp_feedback_enhanced/web/routes/main_routes.py` | FastAPI 路由、WS 端点 | 重写 `/`、`/ws`；新增 `/api/sessions/{sid}/archive` 等 |
-| `src/mcp_feedback_enhanced/web/models/feedback_session.py` | `WebFeedbackSession` 状态机 | 小改：新增 `CANCELED` 状态，孤儿检测接口 |
-| `src/mcp_feedback_enhanced/web/templates/index.html` | 等待页 | 改为双栏壳 |
-| `src/mcp_feedback_enhanced/web/templates/feedback.html` | 反馈页 | 拆为右栏详情组件模板 |
-| `src/mcp_feedback_enhanced/web/static/js/modules/websocket-manager.js` | WS 连接管理 | 改为多路复用 |
-| `src/mcp_feedback_enhanced/web/static/js/modules/session/session-data-manager.js` | 会话数据 | 支持并发多会话；删"旧会话进历史"逻辑 |
-| `src/mcp_feedback_enhanced/web/static/js/modules/session-manager.js` | 会话 UI | 重构为侧栏 + 详情双组件 |
-| `src/mcp_feedback_enhanced/__main__.py` | CLI | 新增 `serve --http` 子命令 |
+| `src/mcp_feedback_enhanced/server.py` | MCP 服务器入口、`interactive_feedback` tool | ✅ 已接入 `mcp.http_app()`；stdio 入口标记废弃 |
+| `src/mcp_feedback_enhanced/daemon.py` | 阶段 2 新增：`build_daemon_app(host, port)` + `serve_http` | ✅ FastAPI 合并 MCP ASGI 子应用，uvicorn 前台运行 |
+| `src/mcp_feedback_enhanced/utils/pid_lock.py` | 阶段 2 新增：`DaemonPidLock` 单实例锁 | ✅ `~/.config/mcp-feedback-enhanced/daemon.pid` + stale 回收 |
+| `src/mcp_feedback_enhanced/web/main.py` | `WebUIManager` 单例 | ✅ 粘滞 active 指针 + `build_sessions_snapshot` + `cancel_session` 真删；保留 `current_session` 属性作为「前端视图焦点」 |
+| `src/mcp_feedback_enhanced/web/routes/main_routes.py` | FastAPI 路由、WS 端点 | ✅ `/` 总是返回 `feedback.html` SPA 壳；WS 多路复用 + 新增 `set_active_session` / `sessions_snapshot` 事件；`/api/sessions/{sid}/archive` 已上线 |
+| `src/mcp_feedback_enhanced/web/models/feedback_session.py` | `WebFeedbackSession` 状态机 | ✅ 已有 `CANCELED` 状态；孤儿检测使用 `_cleanup_done` + 字典 pop 组合兜底 |
+| `src/mcp_feedback_enhanced/web/templates/index.html` | 等待页（历史） | ⚠️ 保留但不再被 `/` 路由选中；可在阶段 5 清理 |
+| `src/mcp_feedback_enhanced/web/templates/feedback.html` | SPA 壳 + 右栏详情模板 | ✅ 引入 `session-store.js` / `session-sidebar.js` / `notify-badge.js` + 所有 JS 的 `?v=` cache buster |
+| `src/mcp_feedback_enhanced/web/static/css/session-sidebar.css` | 侧栏样式（Phase 3 新增） | ✅ 卡片 / active / pending / pulse 动画 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/session-store.js` | 多会话状态 Store（Phase 3 新增） | ✅ 订阅 API + `upsertSession` 尊重粘滞 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/session-sidebar.js` | 侧栏组件（Phase 3 新增） | ✅ 按 `created_at` 降序渲染 + 折叠持久化 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/notify-badge.js` | Title/Favicon/通知/快捷键（Phase 3 新增） | ✅ `(N)` 前缀 + Canvas favicon + Cmd/Ctrl+1..9 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/websocket-manager.js` | WS 连接管理 | ✅ 多路复用按 `session_id` 路由；`session_created` 打 pending 标记 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/session/session-data-manager.js` | 会话数据（历史单会话逻辑） | ✅ 保留兼容；多会话语义由 `session-store.js` 接管 |
+| `src/mcp_feedback_enhanced/web/static/js/modules/session-manager.js` | 会话 UI 顶层（历史） | ✅ 保留兼容；侧栏 + 详情已由新组件接管 |
+| `src/mcp_feedback_enhanced/web/static/js/app.js` | FeedbackApp | ✅ `_drafts` + `applyActiveSessionToUI` + `_renderEmptyState` + `_syncFeedbackStateToSession` |
+| `src/mcp_feedback_enhanced/__main__.py` | CLI | ✅ `serve --http --host --port --log-level --pid-file` |
+| `tests/unit/test_multi_session.py` | 多会话单测（Phase 1 新增） | ✅ 更新粘滞语义 + 新增 `test_session_lookup_by_id_after_sticky_active` 回归 |
+| `tests/integration/test_ws_multiplex.py` | WS 多路复用集成测（Phase 3 新增） | ✅ 覆盖 `sessions_snapshot` / `set_active_session` / 路由 |
+| `scripts/dev_sim_feedback.py` | 开发辅助（Phase 3 新增） | ✅ 本地 HTTP transport 下模拟 MCP 调用 |
 
 ## 附录 B：WS 消息示例
 
@@ -578,12 +703,35 @@ test 全过，没有引入新回归。
   "session_id": "abc-123",
   "reason": "user_canceled"
 }
+
+// 客户端 → 服务端：告知后端用户当前在看哪个会话（Phase 3 新增）
+{
+  "type": "set_active_session",
+  "session_id": "abc-123"
+}
+
+// 服务端 → 客户端：确认活跃会话切换（Phase 3 新增）
+{
+  "type": "active_session_ack",
+  "session_id": "abc-123"
+}
+
+// 服务端 → 客户端：新会话创建，带 pending 语义（Phase 3 新增）
+{
+  "type": "session_created",
+  "session_id": "def-456",
+  "session": { "session_id": "def-456", "title": "...", "status": "waiting" },
+  // 前端判断：若当前活跃会话 != session_id 且存在别的活跃会话，
+  // 则把该记录标记 has_pending_notification = true，触发红点/通知
+}
 ```
 
 ---
 
 **维护者**：待定
 **相关文档**：
-- `docs/architecture/system-overview.md`（现架构总览，升级后需更新）
-- `docs/architecture/api-reference.md`（API 变化记录）
+- [phase2-http-daemon-usage.md](./phase2-http-daemon-usage.md)（阶段 2 HTTP daemon 使用指南）
+- [phase3-multi-session-ui-usage.md](./phase3-multi-session-ui-usage.md)（阶段 3 双栏 UI 使用指南）
+- [system-overview.md](./system-overview.md)（架构总览，v3.0 后需同步更新）
+- [api-reference.md](./api-reference.md)（API 变化记录）
 - `MEMORY.md`（AI 协作上下文索引）

@@ -1,103 +1,151 @@
-# SSH Remote 環境瀏覽器啟動問題解決方案
+# SSH Remote 使用指南（v3.0 HTTP Daemon 模式）
 
-## 問題描述
+> 已更新至 v3.0。舊的「等 MCP 自動打開瀏覽器」流程已廢棄——v3.0 改為
+> 在遠端跑一個常駐 daemon，你用**本地**瀏覽器透過 SSH 端口轉發連進去。
 
-在 SSH Remote 環境（如 Cursor SSH Remote、VS Code Remote SSH 、WSL 等）中使用 MCP Feedback Enhanced 時，可能會遇到以下問題：
+## v3.0 模型變化
 
-- 🚫 瀏覽器無法自動啟動
-- ❌ 顯示「無法啟動瀏覽器」錯誤
-- 🔗 Web UI 無法在本地瀏覽器中開啟
+v2.x 每次 `interactive_feedback` 呼叫都會在 MCP 伺服器所在主機上嘗試
+打開瀏覽器。SSH Remote（VS Code Remote / Cursor Remote / 等）遠端
+沒有顯示環境，所以會報錯失敗。
 
-## 原因分析
+v3.0 反轉了這個模型：
 
-SSH Remote 環境的限制：
-1. **顯示環境隔離**: 遠端伺服器沒有圖形界面環境
-2. **網路隔離**: 遠端端口無法直接在本地訪問
-3. **瀏覽器不存在**: 遠端環境通常沒有安裝瀏覽器
+- 在遠端啟動**一個** daemon：`serve --http`；
+- daemon 自己不再打開瀏覽器，只監聽端口；
+- 你從**本地**瀏覽器透過 SSH 轉發的端口連進去（例如 `http://localhost:8765/`）；
+- 所有 AI agent（Cursor Chat 等）向同一個 daemon URL 發 MCP 呼叫。
 
-## 解決方案
+## 1. 在遠端啟動 daemon
 
-### 步驟一：設定端口（可選）
+根據你想用哪種轉發方式，綁定選項有兩種：
 
-MCP Feedback Enhanced 預設使用端口 **8765**，您也可以自定義端口：
+### 方案 A —— 綁定 localhost，用 SSH 轉發（推薦）
 
-![設定端口](../images/ssh-remote-port-setting.png)
+遠端執行：
 
-### 步驟二：等待 MCP 呼叫
+```bash
+# 前台執行，Ctrl+C 停止
+uvx mcp-feedback-enhanced serve --http
+# 或
+uv run python -m mcp_feedback_enhanced serve --http
+```
 
-**重要**：不要手動啟動 Web UI，而是要等待 AI 模型呼叫 MCP 工具時自動啟動。
+預設綁定 `127.0.0.1:8765`，僅本機可存取，遠端網路看不到。
 
-當 AI 模型呼叫 `interactive_feedback` 工具時，系統會自動啟動 Web UI。
+然後在本地做端口轉發（見 §2）。
 
-### 步驟三：查看端口並連接
+### 方案 B —— 綁定所有網卡（僅在你控制網路時使用）
 
-如果瀏覽器沒有自動啟動，您需要手動連接到 Web UI：
+```bash
+uvx mcp-feedback-enhanced serve --http --host 0.0.0.0 --port 8765
+```
 
-#### 方法一：查看端口轉發
-查看您的 SSH Remote 環境的端口轉發設定，找到對應的本地端口：
+會在所有網卡監聽。**僅當**遠端在防火牆後且端口不對公網開放時安全。
+daemon 本身不做鑑權。
 
-![連接到 URL](../images/ssh-remote-connect-url.png)
-
-#### 方法二：使用 Debug 模式查看
-在 IDE 中開啟 Debug 模式，選擇「輸出」→「MCP Log」，可以看到 Web UI 的 URL：
-
-![Debug 模式查看端口](../images/ssh-remote-debug-port.png)
-
-### 步驟四：在本地瀏覽器開啟
-
-1. 複製 URL（通常是 `http://localhost:8765` 或其他端口）
-2. 在本地瀏覽器中貼上並開啟
-3. 開始使用 Web UI 進行回饋
-
-## 端口轉發設定
+## 2. 本地端口轉發
 
 ### VS Code Remote SSH
-1. 在 VS Code 中按 `Ctrl+Shift+P`
-2. 輸入 "Forward a Port"
-3. 輸入端口號（預設 8765）
-4. 在本地瀏覽器中訪問 `http://localhost:8765`
 
-### Cursor SSH Remote
-1. 查看 Cursor 的端口轉發設定
-2. 手動添加端口轉發規則（端口 8765）
-3. 在本地瀏覽器中訪問轉發的端口
+1. `Ctrl/Cmd+Shift+P` → `Forward a Port`；
+2. 輸入 `8765`；
+3. 本地瀏覽器打開 `http://localhost:8765/`。
 
-## 重要提醒
+![端口設定](../images/ssh-remote-port-setting.png)
+![連接 URL](../images/ssh-remote-connect-url.png)
 
-### ⚠️ 不要手動啟動
-**請勿**手動執行 `uvx mcp-feedback-enhanced test --web` 等指令，這樣無法與 MCP 系統整合。
+### Cursor Remote
 
-### ✅ 正確流程
-1. 等待 AI 模型呼叫 MCP 工具
-2. 系統自動啟動 Web UI
-3. 查看端口轉發或 Debug 日誌
-4. 在本地瀏覽器中開啟對應 URL
+1. 打開 Ports 面板（命令面板 → `Toggle Ports`）；
+2. 添加 `8765` 的轉發規則；
+3. 本地存取 `http://localhost:8765/`。
 
-## 常見問題
+### 純 SSH 命令列
 
-### Q: 為什麼在 SSH Remote 環境中無法自動開啟瀏覽器？
-A: SSH Remote 環境是無頭環境（headless），沒有圖形界面，因此無法直接啟動瀏覽器。需要通過端口轉發在本地瀏覽器中訪問。
+```bash
+ssh -L 8765:127.0.0.1:8765 user@remote-host
+# 然後本地瀏覽器：http://localhost:8765/
+```
 
-### Q: 如何確認 Web UI 是否正常啟動？
-A: 查看 IDE 的 Debug 輸出或 MCP Log，如果看到 "Web UI 已啟動" 的訊息，表示啟動成功。
+## 3. Agent 端 `mcp.json`
 
-### Q: 端口被占用怎麼辦？
-A: 在 MCP 設定中修改端口號，或者等待系統自動選擇其他可用端口。
+你的 AI agent（Cursor IDE）跑在**本地**，只要本地能存取 MCP 端點就行。
+SSH 轉發之後：
 
-### Q: 找不到端口轉發設定怎麼辦？
-A: 查看您的 SSH Remote 工具文檔，或使用 Debug 模式查看 MCP Log 中的 URL。
+```json
+{
+  "mcpServers": {
+    "mcp-feedback-enhanced": {
+      "url": "http://127.0.0.1:8765/mcp/",
+      "autoApprove": ["interactive_feedback"]
+    }
+  }
+}
+```
 
-### Q: 為什麼沒有接收到 MCP 新的反饋？
-A: 可能是 WebSocket 連接有問題。**解決方法**：直接重新整理瀏覽器頁面，這會重新建立 WebSocket 連接。
+URL 末尾 `/` 必須保留。
 
-### Q: 為什麼沒有呼叫出 MCP？
-A: 請確認 MCP 工具狀態為綠燈（表示正常運作）。**解決方法**：
-- 檢查 IDE 中的 MCP 工具狀態指示燈
-- 如果不是綠燈，嘗試反覆開關 MCP 工具
-- 等待幾秒鐘讓系統重新連接
+## 4. 首次可用性測試
 
-### Q: 為什麼 Augment 無法啟動 MCP？
-A: 有時候可能會有錯誤導致 MCP 工具沒有顯示綠燈狀態。**解決方法**：
-- 完全關閉並重新啟動 VS Code 或 Cursor
-- 重新開啟專案
-- 等待 MCP 工具重新載入並顯示綠燈
+```bash
+# 在本地筆電上，SSH 轉發起來之後
+curl http://localhost:8765/api/all-sessions
+# → {"sessions":[]}
+curl -s http://localhost:8765/ | head -n 5
+# → HTML
+```
+
+兩條都通後，在 Cursor 裡發一條會觸發 `interactive_feedback` 的訊息。
+`http://localhost:8765/` 的側欄應出現新卡片。
+
+## 5. 常見問題
+
+**Q：還需要設定 `MCP_WEB_HOST=0.0.0.0` 嗎？**
+A：不需要。那是 v2.x 為解決「遠端自動打開的瀏覽器看不到本地」臨時
+搞的環境變數。v3.0 如果真要綁所有網卡，直接 `serve --host 0.0.0.0`
+（方案 B）。
+
+**Q：daemon 報 `address already in use`。**
+A：其他 `mcp-feedback-enhanced` 進程或別的服務佔著 8765。要麼停
+（`lsof -i :8765` → 殺 PID），要麼 `--port 18765` 換端口並同步改
+SSH 轉發。
+
+**Q：PID 鎖說 daemon 正在執行但我找不到進程。**
+A：Stale lock。刪掉檔案再重啟：
+
+```bash
+rm ~/.config/mcp-feedback-enhanced/daemon.pid
+uvx mcp-feedback-enhanced serve --http
+```
+
+**Q：agent 一直連本地 8765，但 daemon 在伺服器上——沒反應。**
+A：SSH 端口轉發其實沒生效。回到 §2 重新檢查，先用
+`curl http://localhost:8765/api/all-sessions` 從筆電驗證能通，再
+發起 AI 呼叫。
+
+**Q：SSH 斷開後 daemon 還能活著嗎？**
+A：直接 `uvx ... serve --http` 是前台進程，Ctrl+C / SIGHUP 會把它殺掉。
+要長期存活用 `tmux` / `screen` / `nohup`：
+
+```bash
+tmux new -d -s mcp-feedback 'uvx mcp-feedback-enhanced serve --http'
+```
+
+v3.0 刻意不提供 LaunchAgent / systemd 範本（設計決議見
+[multi-session-http-redesign.md §7.14](../../architecture/multi-session-http-redesign.md)）。
+
+**Q：同一台遠端機上能否多個用戶共用一個 daemon？**
+A：不推薦。PID 鎖按用戶隔離（`~/.config/...`），但會話列表會在所有
+存取者之間共享——隱私風險。每人起自己的 daemon，分配不同端口。
+
+**Q：瀏覽器 console 偶爾顯示 WebSocket "disconnected"（網路抖動之後）。**
+A：頁面會自動重連。若沒有，重新整理即可——會話狀態全部在伺服端，
+`sessions_snapshot` 事件會重新同步。
+
+---
+
+**相關文檔**：
+- [階段 2：HTTP Daemon 使用指南](../../architecture/phase2-http-daemon-usage.md)
+- [階段 3：雙欄多會話 UI 使用指南](../../architecture/phase3-multi-session-ui-usage.md)
+- [Cache 管理](../cache-management.md)

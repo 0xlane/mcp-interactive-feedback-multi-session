@@ -1,642 +1,316 @@
-# 部署指南
+# 部署指南 · v3.0
 
-## 🚀 部署架構概覽
+> v3.0 是 **单实例 HTTP daemon**，需要用户显式把它跑起来并保持常驻。
+> 所有 AI Agent（Cursor / Claude / Cline / 自制脚本）通过同一个
+> `http://host:port/mcp/` 地址与它通信，不再每个 Agent 进程自带一个
+> stdio 版本。
 
-MCP Feedback Enhanced 支援多種部署環境，具備智能環境檢測和自適應配置能力。
+目录：
 
-### 部署拓撲圖
+1. [前置条件](#1-前置条件)
+2. [本地部署](#2-本地部署)
+3. [SSH 远程 / 端口转发](#3-ssh-远程--端口转发)
+4. [配置 AI Agent](#4-配置-ai-agent)
+5. [进程管理 (launchctl / systemd / tmux)](#5-进程管理-launchctl--systemd--tmux)
+6. [升级 / 回滚](#6-升级--回滚)
+7. [可选：从源码运行](#7-可选从源码运行)
+8. [卸载 / 清理](#8-卸载--清理)
 
-```mermaid
-graph TB
-    subgraph "本地開發環境"
-        LOCAL[本地機器]
-        LOCAL_BROWSER[本地瀏覽器]
-        LOCAL --> LOCAL_BROWSER
-    end
+---
 
-    subgraph "SSH 遠程環境"
-        REMOTE[遠程服務器]
-        SSH_TUNNEL[SSH 隧道]
-        LOCAL_CLIENT[本地客戶端]
-        REMOTE --> SSH_TUNNEL
-        SSH_TUNNEL --> LOCAL_CLIENT
-    end
+## 1. 前置条件
 
-    subgraph "WSL 環境"
-        WSL[WSL 子系統]
-        WIN_BROWSER[Windows 瀏覽器]
-        WSL --> WIN_BROWSER
-    end
+- Python **3.11+**。
+- `uv` / `uvx` ≥ 0.4（推荐最新）。安装：
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+- 可写目录：
+  - `~/.config/mcp-feedback-enhanced/`（PID 锁、ui_settings.json、
+    session_history.json）
+  - `~/.cache/uv/`（uv 下载缓存；参见
+    [`../en/cache-management.md`](../en/cache-management.md) /
+    [`zh-CN`](../zh-CN/cache-management.md) /
+    [`zh-TW`](../zh-TW/cache-management.md)）
+- 网络：
+  - 本地使用无需公网；
+  - SSH 远程场景需要能 SSH 到远程主机，能建立本地端口转发。
 
-    subgraph "容器化部署"
-        DOCKER[Docker 容器]
-        PORT_MAP[埠映射]
-        HOST[宿主機]
-        DOCKER --> PORT_MAP
-        PORT_MAP --> HOST
-    end
+---
+
+## 2. 本地部署
+
+最小可用命令：
+
+```bash
+uvx mcp-feedback-enhanced serve --http
 ```
 
-## 🛠️ 安裝和配置
+等价于：
 
-### 系統要求
-
-#### 最低要求
-- **Python**: 3.11 或更高版本
-- **內存**: 512MB 可用內存
-- **磁盤**: 100MB 可用空間
-- **網路**: 可訪問的網路連接
-- **瀏覽器**: 支援 Web Audio API 的現代瀏覽器（v2.4.3 音效功能）
-
-#### 推薦配置
-- **Python**: 3.12+
-- **內存**: 1GB+ 可用內存
-- **磁盤**: 500MB+ 可用空間（包含音效文件存儲）
-- **CPU**: 2 核心或更多
-- **瀏覽器**: Chrome 90+, Firefox 88+, Safari 14+（完整功能支援）
-
-### 安裝方式
-
-#### 1. 使用 uvx（推薦）
 ```bash
-# 直接運行
-uvx mcp-feedback-enhanced@latest web
-
-# 指定版本
-uvx mcp-feedback-enhanced@2.4.3 web
+uvx mcp-feedback-enhanced serve --http \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --log-level info
 ```
 
-#### 2. 使用 pip
-```bash
-# 安裝
-pip install mcp-feedback-enhanced
+成功后终端会打印类似：
 
-# 運行
-mcp-feedback-enhanced web
+```
+INFO: Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
 ```
 
-#### 3. 從源碼安裝
-```bash
-# 克隆倉庫
-git clone https://github.com/Minidoracat/mcp-feedback-enhanced.git
-cd mcp-feedback-enhanced
+然后浏览器打开：
 
-# 使用 uv 安裝
+```
+http://127.0.0.1:8765
+```
+
+### 2.1 常用参数速查
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--host` | `127.0.0.1` | 绑定地址。跨主机请改成 `0.0.0.0` 或内网 IP，并自觉加防火墙/端口转发 |
+| `--port` | `8765` | 被占用**不会**自动递增，直接失败。固定端口有助于 `mcp.json` 稳定 |
+| `--log-level` | `info` | `critical` / `error` / `warning` / `info` / `debug` / `trace` |
+| `--pid-file PATH` | `~/.config/mcp-feedback-enhanced/daemon.pid` | 若要跑两个不同端口的 daemon（极少见），请显式分开 PID 文件 |
+
+### 2.2 日志
+
+`info` 级已经包含所有业务级事件；排查复杂问题时切到 `debug`。
+终端日志不落盘；若要长时间保留，请配合 `tee`、`systemd` 或外置日志
+管理工具。
+
+### 2.3 单实例锁
+
+- 再次执行 `serve --http` 会读取 `daemon.pid`，若 PID 仍活就打印：
+  ```
+  ✗ daemon already running at 127.0.0.1:8765 (pid=12345)
+    提示：若确认前一个 daemon 已死，可手动删除 PID 文件后重试。
+  ```
+- 原 PID 已死（例如 kill -9）时会自动回收，正常启动。
+- 强行清理：`rm ~/.config/mcp-feedback-enhanced/daemon.pid`（仅在确认
+  没有活着的 daemon 时）。
+
+---
+
+## 3. SSH 远程 / 端口转发
+
+详见 [`../en/ssh-remote/browser-launch-issues.md`](../en/ssh-remote/browser-launch-issues.md)
+（含中英繁三语版本）。核心步骤：
+
+1. 在**远程主机**启动 daemon（推荐显式 `--port`）：
+
+   ```bash
+   uvx mcp-feedback-enhanced serve --http --port 8765
+   ```
+
+2. 在**本地机器**建立 SSH 端口转发：
+
+   ```bash
+   ssh -N -L 8765:127.0.0.1:8765 user@remote-host
+   ```
+
+   也可以让 IDE 代办（VS Code / Cursor 的 Forwarded Ports 面板）。
+
+3. 本地浏览器访问：
+
+   ```
+   http://127.0.0.1:8765
+   ```
+
+若远程 Agent 与 daemon 在**同一台远程主机**上，`mcp.json` 可以直接
+配 `http://127.0.0.1:8765/mcp/`；从本地访问 UI 走上面的端口转发即可。
+
+---
+
+## 4. 配置 AI Agent
+
+### 4.1 Cursor / Claude Desktop
+
+在 `mcp.json` 里增加：
+
+```json
+{
+  "mcpServers": {
+    "mcp-feedback-enhanced": {
+      "transport": "http",
+      "url": "http://127.0.0.1:8765/mcp/",
+      "headers": {}
+    }
+  }
+}
+```
+
+- Cursor 中 `mcp.json` 通常在 `~/.cursor/mcp.json` 或项目 `.cursor/mcp.json`。
+- `url` 结尾的 `/mcp/` **必须保留**，否则会命中 SPA 外壳 404。
+- `headers` 留空即可；v3.0 未启用鉴权。
+
+### 4.2 Cursor CLI / 其它 MCP 客户端
+
+任何支持 Streamable HTTP 的 MCP 客户端都可以直接指向同一个 URL。
+不同客户端之间互相感知：它们的 `interactive_feedback` 调用都落到
+**同一个** daemon，用户在同一个浏览器里一次性处理。
+
+### 4.3 推荐做法
+
+- 给每个 Agent 调用 `interactive_feedback` 时都带上 `title`，让侧栏
+  可以一眼分辨来源（例如 `"Cursor - 重构 hotkeys"`、
+  `"CLI - 批量重命名脚本"`）。
+- 同一台机器多开 Cursor 项目 + 多开终端 Cline 是典型场景，v3.0
+  就是为此设计。
+
+---
+
+## 5. 进程管理 (launchctl / systemd / tmux)
+
+v3.0 不内建「后台守护进程」模式：`uvx ... serve --http` 是前台阻塞
+的。推荐用系统自带工具把它拉起来。
+
+### 5.1 macOS · launchctl
+
+`~/Library/LaunchAgents/com.user.mcp-feedback-enhanced.plist`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.user.mcp-feedback-enhanced</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/you/.local/bin/uvx</string>
+    <string>mcp-feedback-enhanced</string>
+    <string>serve</string>
+    <string>--http</string>
+    <string>--host</string><string>127.0.0.1</string>
+    <string>--port</string><string>8765</string>
+    <string>--log-level</string><string>info</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/mcp-feedback-enhanced.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/mcp-feedback-enhanced.err</string>
+</dict>
+</plist>
+```
+
+加载：
+
+```bash
+launchctl load -w ~/Library/LaunchAgents/com.user.mcp-feedback-enhanced.plist
+```
+
+### 5.2 Linux · systemd user unit
+
+`~/.config/systemd/user/mcp-feedback-enhanced.service`：
+
+```ini
+[Unit]
+Description=MCP Feedback Enhanced (HTTP daemon)
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/uvx mcp-feedback-enhanced serve --http --port 8765
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+```
+
+启用：
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now mcp-feedback-enhanced
+journalctl --user -u mcp-feedback-enhanced -f
+```
+
+### 5.3 SSH 远程 · tmux / screen
+
+懒人法：
+
+```bash
+ssh user@remote
+tmux new -s mcp-fb
+uvx mcp-feedback-enhanced serve --http --port 8765
+# Ctrl+B D detach，下次 tmux attach -t mcp-fb
+```
+
+### 5.4 Windows · 推荐 WSL
+
+目前主要在 macOS / Linux 上测试。Windows 原生建议用 WSL2 + 上面的
+systemd user unit；或自行包装 Task Scheduler。
+
+---
+
+## 6. 升级 / 回滚
+
+### 6.1 升级
+
+```bash
+# 1. 停 daemon（Ctrl+C 或 launchctl unload / systemctl --user stop）
+# 2. 更新 uv 缓存 + 拉最新版
+uv cache clean
+uvx mcp-feedback-enhanced@latest serve --http
+```
+
+- 发布位于 PyPI（详情见 [`../WORKFLOWS.md`](../WORKFLOWS.md)）。
+- 启动后可通过 `mcp-feedback-enhanced version` 或页脚查看版本号。
+
+### 6.2 固定版本
+
+```bash
+uvx mcp-feedback-enhanced@3.0.0 serve --http
+```
+
+在 CI / 生产环境建议 **pin 具体 minor 版本**，避免次次重启都解析最新
+依赖。
+
+### 6.3 回滚
+
+```bash
+uv cache clean
+uvx mcp-feedback-enhanced@2.x.y serve  # 或 stdio 模式
+```
+
+> ⚠️ v2.x 的 `mcp.json` 是 stdio 形态；回滚时别忘了一并恢复 Agent 侧
+> 配置。
+
+---
+
+## 7. 可选：从源码运行
+
+适合本仓库开发者：
+
+```bash
+git clone https://github.com/<你 fork 的路径>/mcp-interactive-feedback-multi-session.git
+cd mcp-interactive-feedback-multi-session
 uv sync
-
-# 運行
-uv run python -m mcp_feedback_enhanced web
+uv run python -m mcp_feedback_enhanced serve --http --port 8765
 ```
 
-## 🌍 環境配置
-
-### 環境檢測機制
-
-```mermaid
-flowchart TD
-    START[啟動檢測] --> SSH{SSH 環境?}
-    SSH -->|是| SSH_CONFIG[SSH 配置]
-    SSH -->|否| WSL{WSL 環境?}
-    WSL -->|是| WSL_CONFIG[WSL 配置]
-    WSL -->|否| LOCAL_CONFIG[本地配置]
-
-    SSH_CONFIG --> TUNNEL[建立 SSH 隧道]
-    WSL_CONFIG --> WSL_BROWSER[WSL 瀏覽器開啟]
-    LOCAL_CONFIG --> LOCAL_BROWSER[本地瀏覽器開啟]
-
-    TUNNEL --> SUCCESS[部署成功]
-    WSL_BROWSER --> SUCCESS
-    LOCAL_BROWSER --> SUCCESS
-```
-
-### 1. 本地環境部署
-
-**特點**:
-- 直接在本地機器運行
-- 自動開啟本地瀏覽器
-- 最簡單的部署方式
-
-**配置**:
-```bash
-# 運行命令
-mcp-feedback-enhanced web
-
-# 自動檢測並開啟瀏覽器
-# 默認地址: http://localhost:8000
-```
-
-### 2. SSH 遠程環境部署
-
-**特點**:
-- 在遠程服務器運行服務
-- 自動建立 SSH 隧道
-- 本地瀏覽器訪問遠程服務
-
-**配置步驟**:
-
-1. **在遠程服務器安裝**:
-```bash
-# SSH 連接到遠程服務器
-ssh user@remote-server
-
-# 安裝服務
-pip install mcp-feedback-enhanced
-```
-
-2. **運行服務**:
-```bash
-# 在遠程服務器運行
-mcp-feedback-enhanced web --host 0.0.0.0 --port 8000
-```
-
-3. **建立 SSH 隧道**（自動或手動）:
-```bash
-# 手動建立隧道（如果自動檢測失敗）
-ssh -L 8000:localhost:8000 user@remote-server
-```
-
-### 3. WSL 環境部署
-
-**特點**:
-- 在 WSL 子系統中運行
-- 自動開啟 Windows 瀏覽器
-- 跨系統無縫集成
-
-**配置**:
-```bash
-# 在 WSL 中運行
-mcp-feedback-enhanced web
-
-# 自動檢測 WSL 環境並開啟 Windows 瀏覽器
-```
-
-### 4. 容器化部署
-
-#### Docker 部署
-```dockerfile
-# Dockerfile
-FROM python:3.12-slim
-
-WORKDIR /app
-COPY . .
-
-RUN pip install mcp-feedback-enhanced
-
-EXPOSE 8000
-
-CMD ["mcp-feedback-enhanced", "web", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-```bash
-# 構建和運行
-docker build -t mcp-feedback-enhanced .
-docker run -p 8000:8000 mcp-feedback-enhanced
-```
-
-#### Docker Compose
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  mcp-feedback:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - ENVIRONMENT=docker
-    volumes:
-      - ./projects:/app/projects
-    restart: unless-stopped
-```
-
-## ⚙️ 配置選項
-
-### 命令行參數
-
-```bash
-mcp-feedback-enhanced web [OPTIONS]
-```
-
-| 參數 | 類型 | 預設值 | 描述 |
-|------|------|--------|------|
-| `--host` | `str` | `localhost` | 綁定的主機地址 |
-| `--port` | `int` | `8000` | 服務埠號 |
-| `--debug` | `bool` | `False` | 啟用調試模式 |
-| `--no-browser` | `bool` | `False` | 不自動開啟瀏覽器 |
-| `--timeout` | `int` | `600` | 預設會話超時時間（秒） |
-| `--audio-enabled` | `bool` | `True` | 啟用音效通知（v2.4.3 新增） |
-| `--session-retention` | `int` | `72` | 會話歷史保存時間（小時，v2.4.3 新增） |
-
-### 環境變數
-
-```bash
-# 設置環境變數
-export MCP_FEEDBACK_HOST=0.0.0.0
-export MCP_FEEDBACK_PORT=9000
-export MCP_FEEDBACK_DEBUG=true
-export MCP_FEEDBACK_TIMEOUT=1200
-export MCP_FEEDBACK_AUDIO_ENABLED=true
-export MCP_FEEDBACK_SESSION_RETENTION=72
-```
-
-### 配置文件
-```json
-// config.json
-{
-    "server": {
-        "host": "localhost",
-        "port": 8000,
-        "debug": false
-    },
-    "session": {
-        "timeout": 600,
-        "max_connections": 5
-    },
-    "ui": {
-        "default_language": "zh-TW",
-        "theme": "light"
-    },
-    "audio": {
-        "enabled": true,
-        "default_volume": 75,
-        "max_custom_audios": 20,
-        "max_file_size_mb": 2
-    },
-    "session_history": {
-        "retention_hours": 72,
-        "max_retention_hours": 168,
-        "privacy_level": "full",
-        "auto_cleanup": true
-    }
-}
-```
-
-## 🆕 v2.4.3 版本部署考慮
-
-### 音效通知系統部署
-
-#### 瀏覽器相容性檢查
-```javascript
-// 檢查 Web Audio API 支援
-function checkAudioSupport() {
-    if (typeof Audio === 'undefined') {
-        console.warn('Web Audio API 不支援，音效功能將被停用');
-        return false;
-    }
-    return true;
-}
-```
-
-#### 音效文件存儲配置
-```json
-{
-    "audio_storage": {
-        "type": "localStorage",
-        "max_size_mb": 10,
-        "compression": true,
-        "fallback_enabled": true
-    }
-}
-```
-
-#### 自動播放政策處理
-```bash
-# 部署時需要考慮瀏覽器自動播放限制
-# Chrome: 需要用戶交互後才能播放音效
-# Firefox: 預設允許音效播放
-# Safari: 需要用戶手勢觸發
-```
-
-### 會話管理重構部署
-
-#### localStorage 容量規劃
-```javascript
-// 估算存儲需求
-const estimatedStorage = {
-    sessions_per_day: 50,
-    average_session_size_kb: 5,
-    retention_days: 3,
-    total_size_mb: (50 * 5 * 3) / 1024  // 約 0.73 MB
-};
-```
-
-#### 隱私設定配置
-```json
-{
-    "privacy_defaults": {
-        "user_message_recording": "full",
-        "retention_hours": 72,
-        "auto_cleanup": true,
-        "export_enabled": true
-    }
-}
-```
-
-### 智能記憶功能部署
-
-#### ResizeObserver 支援檢查
-```javascript
-// 檢查 ResizeObserver 支援
-if (typeof ResizeObserver === 'undefined') {
-    console.warn('ResizeObserver 不支援，高度記憶功能將使用 fallback');
-    // 使用 window.resize 事件作為 fallback
-}
-```
-
-#### 設定存儲優化
-```json
-{
-    "memory_settings": {
-        "debounce_delay_ms": 500,
-        "max_stored_heights": 10,
-        "cleanup_interval_hours": 24
-    }
-}
-```
-
-## 🔧 運維管理
-
-### 服務監控
-
-#### 健康檢查端點
-```bash
-# 檢查服務狀態
-curl http://localhost:8000/health
-
-# 響應示例
-{
-    "status": "healthy",
-    "version": "2.4.3",
-    "uptime": "2h 30m 15s",
-    "active_sessions": 1,
-    "features": {
-        "audio_notifications": true,
-        "session_history": true,
-        "smart_memory": true
-    },
-    "storage": {
-        "session_history_count": 25,
-        "custom_audio_count": 3,
-        "localStorage_usage_mb": 1.2
-    }
-}
-```
-
-#### 日誌監控
-```python
-# 日誌配置
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('mcp-feedback.log'),
-        logging.StreamHandler()
-    ]
-)
-```
-
-### 性能調優
-
-#### 內存優化
-```python
-# 會話清理配置
-SESSION_CLEANUP_INTERVAL = 300  # 5分鐘
-SESSION_TIMEOUT = 600  # 10分鐘
-MAX_CONCURRENT_SESSIONS = 10
-```
-
-#### 網路優化
-```python
-# WebSocket 配置
-WEBSOCKET_PING_INTERVAL = 30
-WEBSOCKET_PING_TIMEOUT = 10
-MAX_WEBSOCKET_CONNECTIONS = 50
-```
-
-### 故障排除
-
-#### 常見問題
-
-**v2.4.3 新增問題**：
-
-1. **音效無法播放**
-```bash
-# 檢查瀏覽器自動播放政策
-# 解決方案：用戶需要先與頁面交互
-console.log('請點擊頁面任意位置以啟用音效功能');
-
-# 檢查音效文件格式
-# 支援格式：MP3, WAV, OGG
-# 最大文件大小：2MB
-```
-
-2. **會話歷史丟失**
-```bash
-# 檢查 localStorage 容量
-# 解決方案：清理過期數據或增加保存期限
-localStorage.getItem('sessionHistory');
-
-# 檢查隱私設定
-# 確認用戶訊息記錄等級設定正確
-```
-
-3. **輸入框高度不記憶**
-```bash
-# 檢查 ResizeObserver 支援
-if (typeof ResizeObserver === 'undefined') {
-    console.warn('瀏覽器不支援 ResizeObserver');
-}
-
-# 檢查設定存儲
-localStorage.getItem('combinedFeedbackTextHeight');
-```
-
-4. **埠被佔用**
-```bash
-# 檢查埠使用情況
-netstat -tulpn | grep 8000
-
-# 解決方案：使用不同埠
-mcp-feedback-enhanced web --port 8001
-```
-
-2. **瀏覽器無法開啟**
-```bash
-# 手動開啟瀏覽器
-mcp-feedback-enhanced web --no-browser
-# 然後手動訪問 http://localhost:8000
-```
-
-3. **SSH 隧道失敗**
-```bash
-# 手動建立隧道
-ssh -L 8000:localhost:8000 user@remote-server
-
-# 或使用不同埠
-ssh -L 8001:localhost:8000 user@remote-server
-```
-
-#### 調試模式
-```bash
-# 啟用詳細日誌
-mcp-feedback-enhanced web --debug
-
-# 查看詳細錯誤信息
-export PYTHONPATH=.
-python -m mcp_feedback_enhanced.debug
-```
-
-### 安全配置
-
-#### 生產環境安全
-```python
-# 限制 CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://yourdomain.com"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
-
-# 添加安全標頭
-@app.middleware("http")
-async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    return response
-```
-
-#### 防火牆配置
-```bash
-# Ubuntu/Debian
-sudo ufw allow 8000/tcp
-
-# CentOS/RHEL
-sudo firewall-cmd --permanent --add-port=8000/tcp
-sudo firewall-cmd --reload
-```
-
-## 📊 監控和指標
-
-### 系統指標
-- CPU 使用率
-- 內存使用量
-- 網路連接數
-- 活躍會話數
-
-### 業務指標
-- 會話創建率
-- 回饋提交率
-- 平均回應時間
-- 錯誤率
-
-### v2.4.3 新增指標
-- 音效播放成功率
-- 會話歷史存儲使用量
-- 自訂音效上傳數量
-- 輸入框高度調整頻率
-- localStorage 使用量
-
-### 監控工具集成
-```python
-# Prometheus 指標
-from prometheus_client import Counter, Histogram, Gauge
-
-session_counter = Counter('mcp_sessions_total', 'Total sessions created')
-response_time = Histogram('mcp_response_time_seconds', 'Response time')
-active_sessions = Gauge('mcp_active_sessions', 'Active sessions')
-
-# v2.4.3 新增指標
-audio_plays = Counter('mcp_audio_plays_total', 'Total audio notifications played')
-audio_errors = Counter('mcp_audio_errors_total', 'Total audio playback errors')
-session_history_size = Gauge('mcp_session_history_size_bytes', 'Session history storage size')
-custom_audio_count = Gauge('mcp_custom_audio_count', 'Number of custom audio files')
-height_adjustments = Counter('mcp_height_adjustments_total', 'Total textarea height adjustments')
-```
+- 改完 JS / CSS 请同步升 `feedback.html` 里的 `?v=YYYYMMDDNN` 时间戳，
+  确保浏览器加载到新资源（Phase 3 已形成惯例）。
+- 测试：`uv run pytest -x`。
+- 模拟 AI 调用：`uv run python scripts/dev_sim_feedback.py --timeout 1800`。
 
 ---
 
-## 🔄 版本升級指南
+## 8. 卸载 / 清理
 
-### 從 v2.4.2 升級到 v2.4.3
-
-#### 1. 備份現有數據
-```bash
-# 備份用戶設定
-cp ~/.mcp-feedback/settings.json ~/.mcp-feedback/settings.json.backup
-
-# 備份提示詞數據
-cp ~/.mcp-feedback/prompts.json ~/.mcp-feedback/prompts.json.backup
-```
-
-#### 2. 升級軟體
-```bash
-# 使用 uvx 升級
-uvx mcp-feedback-enhanced@2.4.3 web
-
-# 或使用 pip 升級
-pip install --upgrade mcp-feedback-enhanced==2.4.3
-```
-
-#### 3. 驗證新功能
-```bash
-# 檢查音效功能
-curl http://localhost:8000/health | jq '.features.audio_notifications'
-
-# 檢查會話歷史功能
-curl http://localhost:8000/health | jq '.features.session_history'
-
-# 檢查智能記憶功能
-curl http://localhost:8000/health | jq '.features.smart_memory'
-```
-
-#### 4. 配置遷移
-```json
-// 新增的配置項目會自動使用預設值
-{
-    "audio": {
-        "enabled": true,
-        "volume": 75,
-        "selectedAudioId": "default-beep"
-    },
-    "sessionHistory": {
-        "retentionHours": 72,
-        "privacyLevel": "full"
-    },
-    "smartMemory": {
-        "heightMemoryEnabled": true
-    }
-}
-```
-
-### 回滾指南
-
-如果需要回滾到 v2.4.2：
-
-```bash
-# 停止服務
-pkill -f mcp-feedback-enhanced
-
-# 安裝舊版本
-pip install mcp-feedback-enhanced==2.4.2
-
-# 恢復備份設定
-cp ~/.mcp-feedback/settings.json.backup ~/.mcp-feedback/settings.json
-
-# 重新啟動服務
-mcp-feedback-enhanced web
-```
+1. 停止 daemon（`Ctrl+C`、`launchctl unload` 或 `systemctl --user disable --now`）。
+2. 清理 uv 缓存（可选）：`uv cache clean`。
+3. 删除配置：`rm -rf ~/.config/mcp-feedback-enhanced`。
+4. 若通过 `uv tool install mcp-feedback-enhanced` 安装，另行
+   `uv tool uninstall mcp-feedback-enhanced`。
+5. 撤销 Agent 侧的 `mcp.json` 条目。
 
 ---
 
-**版本**: 2.4.3
-**最後更新**: 2025年6月14日
-**維護者**: Minidoracat
-**新功能**: 音效通知系統、會話管理重構、智能記憶功能、一鍵複製
-**完成**: 架構文檔體系已更新完成，包含 v2.4.3 版本的完整技術文檔和部署指南。
+**文档版本**：v3.0.0-dev · **最后更新**：2026-04-22

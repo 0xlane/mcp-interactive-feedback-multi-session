@@ -1,5 +1,10 @@
 # UV Cache Management Guide
 
+> v3.0 note: the daemon is typically launched via
+> `uvx mcp-feedback-enhanced serve --http` and stays running in the
+> foreground. Stop the daemon (Ctrl+C) before running cache cleanup, or
+> use `--force` which attempts to terminate related processes first.
+
 ## 🔍 Problem Description
 
 Since this project uses `uvx` for execution, cache files are created in the system with each run. Over time, these caches can consume significant disk space.
@@ -40,11 +45,14 @@ python scripts/cleanup_cache.py --force
 
 ### Issue: "File is being used by another process" error during cleanup
 
-**Cause**: MCP server or other uvx processes are running
+**Cause**: The MCP feedback daemon or other uvx processes are running
 
 **Solutions**:
 1. **Close related processes**:
-   - Close Claude Desktop or other MCP-using applications
+   - Stop the daemon (`Ctrl+C` in the terminal where it was launched,
+     or `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`)
+   - Close any Cursor / Claude / other AI agents that may still have
+     MCP sessions open
    - Terminate all `uvx` related processes
 
 2. **Use force cleanup**:
@@ -64,7 +72,9 @@ python scripts/cleanup_cache.py --force
 
 ### Issue: Cache grows large again quickly after cleanup
 
-**Cause**: Frequent use of `uvx mcp-feedback-enhanced@latest`
+**Cause**: Frequent use of `uvx mcp-feedback-enhanced@latest serve --http`
+(or inline calls from MCP clients). Each `uvx` invocation may re-resolve
+dependencies and expand the cache.
 
 **Recommendations**:
 1. **Regular cleanup**: Recommend weekly or monthly cleanup
@@ -123,13 +133,15 @@ python scripts/cleanup_cache.py --clean
 
 ### Common Causes of Cleanup Failure
 
-1. **Process occupation**: MCP server is running
+1. **Process occupation**: the `serve --http` daemon (or another uvx
+   process) is still running
 2. **Insufficient permissions**: Administrator privileges required
 3. **Disk errors**: File system errors
 
 ### Resolution Steps
 
-1. Close all MCP-related processes
+1. Stop the daemon (Ctrl+C / kill PID in `daemon.pid`) and close any
+   AI-agent clients that may still hold MCP sessions
 2. Run cleanup command as administrator
 3. If still failing, restart computer and try again
 4. Consider manually deleting parts of cache directory

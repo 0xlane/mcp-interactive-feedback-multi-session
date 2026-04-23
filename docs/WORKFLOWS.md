@@ -1,159 +1,79 @@
-# GitHub Actions 工作流程說明
+# GitHub Actions 工作流程說明（v3.0）
 
-本項目使用雙工作流程架構來優化構建和發佈流程。
+本項目使用 GitHub Actions 管理 CI / 發佈。v3.0 起停止維護桌面應用
+構建路徑，僅保留 Web（HTTP daemon）發佈流。
 
-## 🏗️ 工作流程架構
+## 🏗️ 現行工作流程
 
-### 1. 桌面應用構建工作流程 (build-desktop.yml)
+### `publish.yml` — PyPI 發佈
 
-**用途**: 專門負責構建多平台桌面應用二進制文件
+**用途**：版本管理 + PyPI 發佈 + GitHub Release
 
-**觸發條件**:
-- 手動觸發 (workflow_dispatch)
-- 桌面應用代碼變更時自動觸發 (`src-tauri/**`, `scripts/build_desktop.py`)
-- Pull Request 中的桌面應用變更
+**觸發條件**：手動觸發（`workflow_dispatch`）
 
-**功能**:
-- 在各自原生平台上構建桌面應用
-- 支援選擇性平台構建
-- 上傳構建產物到 GitHub Artifacts (保留 30 天)
-- 提供詳細的構建摘要
+**功能**：
+- 自動或手動版本號管理（patch / minor / major 或自訂版本）；
+- 發佈到 PyPI；
+- 創建 GitHub Release。
 
-**支援平台**:
-- Windows x64 (`windows-latest`)
-- macOS Intel (`macos-latest` + `x86_64-apple-darwin`)
-- macOS Apple Silicon (`macos-latest` + `aarch64-apple-darwin`)
-- Linux x64 (`ubuntu-latest`)
+**使用方式**：
 
-### 2. 發佈工作流程 (publish.yml)
+1. 前往 GitHub Actions → "Auto Release to PyPI"；
+2. 點擊 "Run workflow"；
+3. 選擇版本類型或輸入自訂版本。
 
-**用途**: 負責版本管理和 PyPI 發佈
+## 🚫 已暫停的工作流程
 
-**觸發條件**:
-- 手動觸發 (workflow_dispatch)
+### `build-desktop.yml` / `build-and-release.yml`
 
-**功能**:
-- 自動或手動版本號管理
-- 可選擇是否包含桌面應用
-- 從最新的桌面應用構建下載二進制文件
-- 發佈到 PyPI
-- 創建 GitHub Release
+這兩個工作流原本負責構建 Tauri 桌面應用。v3.0 起按
+[多會話 HTTP 模式重構設計 §7 決議](./architecture/multi-session-http-redesign.md#7-未提但需考虑的问题清单含决议)
+**暫停維護**桌面模式：
 
-## 🚀 使用方式
+- 工作流文件保留在倉庫，不主動刪除；
+- CI 不再自動觸發桌面構建；
+- 發佈不再附帶桌面二進制文件；
+- 相關 `scripts/build_desktop.py` / `src-tauri/` 源碼保留，供未來可能恢復使用。
 
-### 開發桌面應用時
-
-1. **修改桌面應用代碼** (`src-tauri/` 目錄)
-2. **自動觸發構建** - 推送到 main 分支會自動觸發桌面應用構建
-3. **手動觸發構建** (可選) - 在 GitHub Actions 頁面手動運行 "Build Desktop Applications"
-
-### 發佈新版本時
-
-1. **確保桌面應用已構建** - 檢查最新的 "Build Desktop Applications" 工作流程是否成功
-2. **手動觸發發佈** - 在 GitHub Actions 頁面運行 "Auto Release to PyPI"
-3. **選擇發佈選項**:
-   - `version_type`: patch/minor/major (或使用 custom_version)
-   - `include_desktop`: 是否包含桌面應用 (預設: true)
-   - `desktop_build_run_id`: 指定特定的構建 ID (可選)
-
-## 📋 最佳實踐
-
-### 桌面應用構建
+**如果你真的需要本地構建桌面版**（不推薦）：
 
 ```bash
-# 本地測試桌面應用構建
+# 需要 Rust 工具鏈
 python scripts/build_desktop.py --release
-
-# 檢查構建產物
-ls -la src/mcp_feedback_enhanced/desktop_release/
-ls -la src/mcp_feedback_enhanced/desktop_app/
 ```
 
-### 發佈流程
+但請注意 v3.0 的雙欄多會話 UI 尚未在 Tauri 殼下做過適配測試，行為可能異常。
 
-1. **準備發佈**:
-   - 更新 CHANGELOG 文件
-   - 確保桌面應用構建成功
-   - 測試本地功能
+## 🚀 v3.0 發佈建議流程
 
-2. **執行發佈**:
-   - 手動觸發 "Auto Release to PyPI" 工作流程
-   - 選擇適當的版本類型
-   - 確認包含桌面應用 (如果需要)
-
-3. **發佈後驗證**:
-   - 檢查 PyPI 上的新版本
-   - 測試安裝: `uvx mcp-feedback-enhanced@latest`
-   - 測試桌面模式: `uvx mcp-feedback-enhanced@latest test --desktop`
-
-## 🚀 一鍵構建和發佈
-
-### Build Desktop & Release 工作流程
-
-最簡單的方式是使用 **Build Desktop & Release** 工作流程，它會自動：
-1. 構建所有平台的桌面應用
-2. 等待構建完成
-3. 自動觸發發佈流程
-
-**使用方法**：
-1. 前往 [Build Desktop & Release](../../actions/workflows/build-and-release.yml)
-2. 點擊 "Run workflow"
-3. 選擇版本類型或輸入自定義版本
-4. 選擇要構建的平台（默認：all）
-5. 如果只想構建不發佈，勾選 "只構建桌面應用，不進行發佈"
-
-**優勢**：
-- ✅ 自動化整個流程
-- ✅ 確保桌面應用構建成功後才發佈
-- ✅ 統一的狀態報告
-- ✅ 減少手動操作錯誤
+1. **確認 Pytest 全綠**：`uv run python -m pytest tests/`
+2. **更新 CHANGELOG**：`CHANGELOG.zh-CN.md` / `CHANGELOG.zh-TW.md` / `CHANGELOG.en.md`
+3. **本地驗證 daemon 啟動**：
+   ```bash
+   uv run python -m mcp_feedback_enhanced serve --http --port 18765
+   # 另開終端
+   curl http://127.0.0.1:18765/api/all-sessions
+   ```
+4. **手動觸發 "Auto Release to PyPI"**：選擇版本類型，確認發佈；
+5. **發佈後驗證**：
+   ```bash
+   uvx mcp-feedback-enhanced@latest serve --http --port 18765
+   ```
 
 ## 🔧 故障排除
 
-### 桌面應用構建失敗
+**Q：發佈失敗，提示 PyPI 版本衝突**
+A：檢查 PyPI 上是否已存在相同版本；`pyproject.toml` 版本號未 bump 就不能重發。
 
-1. **檢查構建日誌** - 查看 GitHub Actions 中的詳細錯誤信息
-2. **平台特定問題**:
-   - **macOS**: 可能缺少 Xcode 命令行工具或系統依賴
-   - **Linux**: 可能缺少系統依賴 (GTK, WebKit, Cairo 等)
-   - **Windows**: 通常構建成功，如失敗檢查 MSVC 工具鏈
+**Q：`PYPI_API_TOKEN` 權限問題**
+A：GitHub Repo Settings → Secrets → Actions 檢查 `PYPI_API_TOKEN`；該 Token 需要 `upload` scope。
 
-### 發佈流程問題
+**Q：要恢復桌面構建**
+A：恢復 `build-desktop.yml` 的觸發條件（目前應該是 disabled / 手動觸發）。相關實現細節曾在歷史文檔 `docs/DESKTOP_BUILD.md` 中，該文檔已隨 v3.0 Tauri 暫停維護而刪除，可從 git history 復原。
 
-1. **桌面應用缺失**:
-   - 確認 "Build Desktop Applications" 工作流程已成功運行
-   - 檢查指定的 Run ID 是否正確
-   - 驗證 Artifacts 是否已正確上傳
+---
 
-2. **版本衝突**:
-   - 檢查 PyPI 上是否已存在相同版本
-   - 確認版本號格式正確 (X.Y.Z)
-
-3. **權限問題**:
-   - 確認 PYPI_API_TOKEN 密鑰已正確設置
-   - 檢查 GitHub Token 權限
-
-3. **本地測試** - 在對應平台上運行本地構建腳本
-
-### 發佈時桌面應用缺失
-
-1. **檢查構建狀態** - 確保最新的桌面應用構建成功
-2. **手動指定構建** - 使用 `desktop_build_run_id` 參數指定特定的成功構建
-3. **跳過桌面應用** - 設置 `include_desktop: false` 僅發佈 Web 版本
-
-## 📊 工作流程優勢
-
-### 效率提升
-- **分離關注點**: 構建和發佈獨立進行
-- **避免重複構建**: 不是每次發佈都需要重新構建桌面應用
-- **快速發佈**: 發佈流程更快速，特別是僅修改 Python 代碼時
-
-### 靈活性
-- **選擇性構建**: 可以只構建特定平台
-- **選擇性發佈**: 可以選擇是否包含桌面應用
-- **版本控制**: 可以使用不同的桌面應用構建版本
-
-### 可靠性
-- **原生構建**: 每個平台在其原生環境中構建
-- **構建緩存**: 利用 GitHub Actions 緩存加速構建
-- **錯誤隔離**: 桌面應用構建失敗不會影響 Web 版本發佈
+**相關文檔**：
+- [多會話 HTTP 模式重構設計](./architecture/multi-session-http-redesign.md)（含桌面模式暫停決議）
+- [阶段 2：HTTP Daemon 使用指南](./architecture/phase2-http-daemon-usage.md)
+- [阶段 3：雙欄多會話 UI 使用指南](./architecture/phase3-multi-session-ui-usage.md)

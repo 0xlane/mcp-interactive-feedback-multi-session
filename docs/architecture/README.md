@@ -1,119 +1,79 @@
 # MCP Feedback Enhanced 架構文檔
 
-> ## 🚧 v3.0 重構進行中：單守護 + HTTP 多會話架構
->
-> - **v2.x 架構**（"單活躍會話 + stdio MCP + 每進程一端口"）正在被取代；
-> - **v3.0 目標**：一個本地 daemon，所有 AI Agent 通過 HTTP 連入，一個
->   瀏覽器 Tab 聚合所有並行的 `interactive_feedback` 請求；
-> - **當前進度**：阶段 1 / 2 / 3 已完成（後端多會話 + HTTP daemon +
->   雙欄 UI）；阶段 4 / 5 收尾中；
-> - 若你現在在使用本倉庫，請先閱讀：
->   - [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md)（總體設計 + 經驗教訓）
->   - [阶段 2：HTTP Daemon 使用指南](./phase2-http-daemon-usage.md)（啟動 + `mcp.json` 改造）
->   - [阶段 3：雙欄多會話 UI 使用指南](./phase3-multi-session-ui-usage.md)（界面導覽 + 快捷鍵 + 粘滯 active 語義）
->
-> 本 README 其餘部分（「架構概覽」「v2.4.3 版本亮點」等小節）是 v2.x
-> 的歷史狀態，升級完成後會被改寫。
+> **v3.0 已落地**：單守護進程 + HTTP + 多會話 + 單浏览器視圖。
+> 若你是第一次來看這個倉庫，請從下表的「v3.0 推薦讀物」開始。
+> 關於 v2.x 向 v3.0 的遷移背景、設計取捨與 lessons learned，單獨
+> 記錄在 [`multi-session-http-redesign.md`](./multi-session-http-redesign.md)。
 
 ## 📋 文檔索引
 
-本目錄包含 MCP Feedback Enhanced 專案的完整架構文檔，提供深入的技術分析和設計說明。
-
-### 📚 文檔結構
-
 | 文檔 | 描述 | 適用對象 |
-|------|------|----------|
-| [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) ⭐ | v3.0 總體設計、分階段路線圖、經驗教訓（最新） | 架構師、核心開發 |
-| [阶段 2：HTTP Daemon 使用指南](./phase2-http-daemon-usage.md) 🆕 | `uvx serve --http` 啟動、`mcp.json` 改造、端點清單 | 早期使用者、開發者 |
-| [阶段 3：雙欄多會話 UI 使用指南](./phase3-multi-session-ui-usage.md) 🆕 | 雙欄 UI / 快捷鍵 / 草稿 / 粘滯 active / 歸檔語義 | 日常使用者、核心開發 |
-| [系統架構總覽](./system-overview.md) | 整體架構設計、核心概念和技術亮點（v2.x 歷史） | 架構師、技術負責人 |
-| [組件詳細說明](./component-details.md) | 各層級組件的詳細功能和實現（v2.x 歷史） | 開發人員、維護人員 |
-| [交互流程文檔](./interaction-flows.md) | AI 助手與 MCP 服務的完整交互流程（v2.x 歷史） | 集成開發人員 |
-| [API 參考文檔](./api-reference.md) | MCP 工具接口和 WebSocket API 規範（v2.x 歷史） | API 使用者、前端開發 |
-| [部署指南](./deployment-guide.md) | 環境配置、部署選項和故障排除（v2.x 歷史） | 運維人員、系統管理員 |
-
-### 🏗️ 架構概覽
-
-> 以下為 **v2.x 歷史架構**描述。v3.0 目標架構請見
-> [多會話 HTTP 模式重構設計](./multi-session-http-redesign.md) §3。
-
-MCP Feedback Enhanced（v2.x 時期）採用**單一活躍會話 + 持久化 Web UI**的架構，
-實現了 AI 助手與用戶之間的無縫交互體驗。
-
-#### 核心特性（v2.x 歷史）
-- **智能環境檢測**: 自動識別 Local/SSH Remote/WSL 環境
-- **單一活躍會話**: ~~替代傳統多會話管理，提升性能和用戶體驗~~
-  🚫 **v3.0 已移除**，改為單 daemon + 多會話并存（見 phase3 使用指南）
-- **持久化 Web UI**: 支援多次循環調用，無需重複開啟瀏覽器
-- **實時雙向通信**: WebSocket 實現前後端狀態同步
-- **智能資源管理**: 自動清理和會話生命週期管理
-- **提示詞管理系統**: 常用提示詞的 CRUD 操作和快速選擇
-- **自動提交功能**: 倒數計時器和自動回饋提交機制
-- **會話管理功能**: 會話歷史追蹤和統計分析（v2.4.3 重構增強）
-- **音效通知系統**: 智能音效提醒和自訂音效管理（v2.4.3 新增）
-- **智能記憶功能**: 輸入框高度記憶和一鍵複製（v2.4.3 新增）
-- **多語言支援**: 繁體中文、簡體中文、英文動態切換
-
-#### 技術棧
-- **後端**: Python 3.11+, FastAPI, FastMCP
-- **前端**: HTML5, JavaScript ES6+, WebSocket, Web Audio API（v2.4.3）
-- **通信**: WebSocket, HTTP REST API
-- **存儲**: localStorage（會話歷史、音效文件、設定記憶）
-- **部署**: uvicorn, 跨平台支援
-
-### 🎯 快速導航
-
-- **v3.0 使用（推薦）**：
-  - 啟動 daemon → [阶段 2 使用指南](./phase2-http-daemon-usage.md)
-  - 瀏覽器多會話操作 → [阶段 3 UI 使用指南](./phase3-multi-session-ui-usage.md)
-  - 設計背景與經驗教訓 → [重構設計](./multi-session-http-redesign.md)
-- **v2.x 歷史資料**：
-  - 單會話架構 → [系統架構總覽](./system-overview.md)
-  - 組件細節 → [組件詳細說明](./component-details.md)
-  - 交互流程 → [交互流程文檔](./interaction-flows.md)
-  - API（含仍生效的部分） → [API 參考文檔](./api-reference.md)
-  - 部署（仍適用） → [部署指南](./deployment-guide.md)
-
-### 📊 架構圖表
-
-所有文檔都包含豐富的 Mermaid 圖表，包括：
-- 系統整體架構圖
-- 組件關係圖
-- 交互流程圖
-- 會話生命週期圖
-- 部署拓撲圖
-- **音效通知系統架構圖**（v2.4.3 新增）
-- **會話管理重構流程圖**（v2.4.3 新增）
-- **智能記憶功能架構圖**（v2.4.3 新增）
-
-### 🆕 v2.4.3 版本亮點
-
-#### 🔊 音效通知系統
-- **內建音效**: 經典提示音、通知鈴聲、輕柔鐘聲
-- **自訂音效**: 支援 MP3、WAV、OGG 格式上傳
-- **智能播放**: 會話更新時自動播放通知音效
-- **音量控制**: 0-100% 可調節音量
-- **瀏覽器相容**: 處理自動播放政策限制
-
-#### 📋 會話管理重構
-- **頁籤化設計**: 從側邊欄遷移到獨立頁籤，解決瀏覽器相容性問題
-- **本地歷史存儲**: 支援 72 小時可配置保存期限
-- **隱私控制**: 三級用戶訊息記錄設定（完整/基本/停用）
-- **數據管理**: 匯出和清理功能
-- **詳情查看**: 專門的會話詳情彈窗
-
-#### 🧠 智能記憶功能
-- **輸入框高度記憶**: 自動保存和恢復輸入框高度
-- **一鍵複製**: 專案路徑和會話ID點擊複製
-- **設定持久化**: 用戶偏好自動保存
-- **國際化支援**: 複製提示支援多語言
+| --- | --- | --- |
+| [系統架構總覽](./system-overview.md) ⭐ | v3.0 拓撲、四層架構、與 v2.x 差異 | 所有人 |
+| [組件詳細說明](./component-details.md) | 後端模組責任 + 前端模組地圖 | 開發 / 維護 |
+| [交互流程](./interaction-flows.md) | Daemon 啟動、MCP 調用、切會話、提交、歸檔等序列圖 | 集成 / 調試 |
+| [API 參考](./api-reference.md) | MCP 工具、REST、WebSocket、會話摘要對象 | API 使用者 / 前端 |
+| [部署指南](./deployment-guide.md) | 本地、SSH 遠程、launchctl / systemd、升級回滾 | 運維 / 使用者 |
+| [多會話 HTTP 重構設計](./multi-session-http-redesign.md) | 設計背景、影響矩陣、阶段路線、Phase 3 落地差異 | 架構師、核心開發 |
+| [Phase 2：HTTP Daemon 使用指南](./phase2-http-daemon-usage.md) | `serve --http` 啟動、`mcp.json` 改造、端點清單 | 早期使用者 |
+| [Phase 3：雙欄多會話 UI 使用指南](./phase3-multi-session-ui-usage.md) | 雙欄 UI、快捷鍵、草稿、粘滯 active、歸檔語義 | 日常使用者、前端維護 |
 
 ---
 
-**當前版本**: v3.0.0-dev（multi-session-http 重構中）
-**v2.x 文檔版本**: 2.4.3（2025年6月14日）
-**最後更新**: 2026-04-22（Phase 3 雙欄 UI 落地 + 粘滯 active 修復）
-**架構類型**: v3.0 單 Daemon + FastAPI + FastMCP HTTP + 雙欄 SPA 多會話 UI
-**v3.0 新功能**: 多會話并存、粘滯活躍指針、每會話獨立草稿、Title/Favicon 徽標、`Cmd/Ctrl+1..9` 快捷鍵、批量歸檔
-**v2.x 歷史功能**: 單一活躍會話、提示詞管理、自動提交、會話管理、音效通知、智能記憶
-**文檔狀態**: 🚧 阶段 1/2/3 已落地；阶段 4/5 收尾中；v2.x 子文檔（system-overview / component-details 等）待 v3.0 穩定後統一重寫
+## 🏗️ 架構概覽
+
+v3.0 以三句話講完：
+
+1. **單機一個 daemon**：`uvx mcp-feedback-enhanced serve --http` 常駐，
+   綁定 127.0.0.1:8765（可自定）。
+2. **多會話並存**：每次 MCP `interactive_feedback` 調用插入一個
+   `WebFeedbackSession`，互不銷毀。
+3. **單瀏覽器聚合**：一個 SPA 頁面連 `/ws` 多路復用 WebSocket，
+   所有會話在側欄列出、點擊或 `Cmd/Ctrl+1..9` 切換。
+
+更細節的圖和字段請看 [`system-overview.md`](./system-overview.md)。
+
+### 核心特性
+
+- **多會話並存**（插入式 `create_session`，不再銷毀舊會話）
+- **粘滯活躍指針**（新會話不抢前端視圖，由使用者顯式切換）
+- **單 WebSocket 多路复用**（事件以 `session_id` 路由）
+- **每會話獨立草稿**（切會話不丟輸入）
+- **Title `(N)` / Favicon 紅點 / 系統通知 / `Cmd/Ctrl+1..9`**
+- **歸檔 = 物理刪除**（刷新不會復活已歸檔會話）
+- **PID 鎖 + 顯式固定端口**（多 Agent 安全共享同一 daemon）
+- **三語 i18n**（zh-TW / zh-CN / en）
+
+### 技術棧
+
+- **後端**: Python 3.11+, FastMCP（Streamable HTTP）, FastAPI, uvicorn
+- **前端**: ES modules, 原生 WebSocket, Canvas, Notification API
+- **工具**: `uv` / `uvx`, `pytest` + `pytest-asyncio`, `ruff`, `mypy`
+- **發布**: PyPI（見 [`../WORKFLOWS.md`](../WORKFLOWS.md)；Tauri 桌面
+  構建已暫停）
+
+---
+
+## 🎯 快速導航
+
+- **我要先把它跑起來** → [部署指南](./deployment-guide.md)
+- **我要讓 Agent 連過來** → [API 參考 §1 + §2](./api-reference.md#1-mcp-工具)
+- **我要在瀏覽器裡用它** → [Phase 3 UI 使用指南](./phase3-multi-session-ui-usage.md)
+- **我要改後端** → [組件詳細說明](./component-details.md) + [重構設計](./multi-session-http-redesign.md)
+- **我要改前端** → [組件詳細說明 §8](./component-details.md#8-前端模块地图)
+- **我要接 API** → [API 參考](./api-reference.md)
+- **SSH 遠端** → [`../en/ssh-remote/browser-launch-issues.md`](../en/ssh-remote/browser-launch-issues.md)（含 zh-CN / zh-TW）
+- **桌面模式 / CI 發布** → [`../WORKFLOWS.md`](../WORKFLOWS.md)
+
+---
+
+## 🧭 文檔狀態
+
+所有主要架構文檔均已針對 **v3.0** 重寫。若你在舊分支或歷史提交裡看
+到 v2.x 版本的同名文檔，以本目錄當前 `HEAD` 為準。
+
+---
+
+**當前版本**: v3.0.0-dev
+**最後更新**: 2026-04-22
+**架構類型**: 單 Daemon + FastAPI + FastMCP HTTP + 雙欄 SPA 多會話 UI

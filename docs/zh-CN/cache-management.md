@@ -1,5 +1,10 @@
 # UV Cache 管理指南
 
+> v3.0 说明：守护进程现在通过
+> `uvx mcp-feedback-enhanced serve --http` 常驻启动。执行缓存清理前请
+> 先停止 daemon（Ctrl+C，或 `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`），
+> 或使用 `--force` 让清理脚本尝试先结束相关进程。
+
 ## 🔍 问题说明
 
 由于本项目使用 `uvx` 执行，每次运行都会在系统中建立 cache 文件。随着时间推移，这些 cache 可能会占用大量磁盘空间。
@@ -40,11 +45,13 @@ python scripts/cleanup_cache.py --force
 
 ### 问题：清理时出现「文件正由另一个程序使用」错误
 
-**原因**：有 MCP 服务器或其他 uvx 程序正在运行
+**原因**：`serve --http` daemon 或其他 uvx 程序仍在运行
 
 **解决方案**：
 1. **关闭相关程序**：
-   - 关闭 Claude Desktop 或其他使用 MCP 的应用
+   - 停止 daemon（在启动终端按 Ctrl+C，或
+     `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`）
+   - 关闭 Cursor / Claude / 其它仍持有 MCP 会话的 AI Agent 客户端
    - 结束所有 `uvx` 相关程序
 
 2. **使用强制清理**：
@@ -64,7 +71,9 @@ python scripts/cleanup_cache.py --force
 
 ### 问题：清理后 cache 很快又变大
 
-**原因**：频繁使用 `uvx mcp-feedback-enhanced@latest`
+**原因**：频繁使用 `uvx mcp-feedback-enhanced@latest serve --http`
+（或 AI Agent 通过 MCP 触发的 inline 调用）。每次 `uvx` 启动都可能重
+新解析依赖并扩大缓存。
 
 **建议**：
 1. **定期清理**：建议每周或每月清理一次
@@ -123,13 +132,14 @@ python scripts/cleanup_cache.py --clean
 
 ### 清理失败的常见原因
 
-1. **程序占用**：MCP 服务器正在运行
+1. **程序占用**：`serve --http` daemon 或其它 uvx 程序仍在运行
 2. **权限不足**：需要管理员权限
 3. **磁盘错误**：文件系统错误
 
 ### 解决步骤
 
-1. 关闭所有 MCP 相关程序
+1. 停止 daemon（Ctrl+C 或 `kill` daemon.pid 中的 PID），并关闭仍持有
+   MCP 会话的 AI Agent 客户端
 2. 以管理员身份运行清理命令
 3. 如果仍然失败，重启电脑后再试
 4. 考虑手动删除部分 cache 目录

@@ -1,117 +1,165 @@
-# SSH Remote Environment Browser Launch Issues Solution
+# SSH Remote Guide (v3.0 HTTP Daemon Model)
 
-## Problem Description
+> Updated for v3.0. The old "wait for MCP to auto-launch a browser" flow
+> is gone — v3.0 uses a long-running daemon that you connect to with
+> your local browser via SSH port forwarding.
 
-When using MCP Feedback Enhanced in SSH Remote environments (such as Cursor SSH Remote, VS Code Remote SSH, etc.), you may encounter the following issues:
+## The shift in v3.0
 
-- 🚫 Browser cannot launch automatically
-- ❌ "Unable to launch browser" error message
-- 🔗 Web UI cannot open in local browser
+In v2.x every `interactive_feedback` call tried to open a browser
+window on the same host as the MCP server. On SSH Remote (VS Code
+Remote / Cursor Remote / etc.) the remote host has no display, so that
+failed with confusing errors.
 
-## Root Cause Analysis
+v3.0 flips the model:
 
-SSH Remote environment limitations:
-1. **Display Environment Isolation**: Remote server has no graphical interface environment
-2. **Network Isolation**: Remote ports cannot be directly accessed locally
-3. **No Browser Available**: Remote environments typically don't have browsers installed
+- You run **one daemon** on the remote host: `serve --http`;
+- The daemon never opens a browser itself — it just listens;
+- You connect to it from your **local** browser over an SSH-forwarded
+  port (e.g. `http://localhost:8765/`);
+- All AI agents (Cursor Chat etc.) send their MCP calls to the same
+  daemon URL.
 
-## Solution
+## 1. Start the daemon on the remote host
 
-### Step 1: Configure Host and Port
+Pick one of two host bindings depending on how you want to forward:
 
-You have to set `MCP_WEB_HOST` environment to `0.0.0.0` to allow port forwarding.
+### Option A — bind localhost, forward via SSH (recommended)
 
-MCP Feedback Enhanced uses port **8765** by default, but you can customize the port:
+On the remote:
 
-![Port Settings](../images/ssh-remote-port-setting.png)
+```bash
+# Foreground; Ctrl+C to stop
+uvx mcp-feedback-enhanced serve --http
+# or
+uv run python -m mcp_feedback_enhanced serve --http
+```
 
-### Step 2: Wait for MCP Call
+This binds `127.0.0.1:8765` (loopback only, no exposure to the remote
+network).
 
-**Important**: Do not manually start the Web UI. Instead, wait for the AI model to call the MCP tool to automatically start it.
+On your **local** machine, set up port forwarding (see §2).
 
-When the AI model calls the `interactive_feedback` tool, the system will automatically start the Web UI.
+### Option B — bind all interfaces (only if you control the network)
 
-### Step 3: Check Port and Connect
+```bash
+uvx mcp-feedback-enhanced serve --http --host 0.0.0.0 --port 8765
+```
 
-If the browser doesn't launch automatically, you need to manually connect to the Web UI:
+This listens on every interface. **Only safe if** the remote host is
+behind a firewall and the port is not publicly reachable. No auth is
+enforced by the daemon itself.
 
-#### Method 1: Check Port Forwarding
-Check your SSH Remote environment's port forwarding settings to find the corresponding local port:
-
-![Connect to URL](../images/ssh-remote-connect-url.png)
-
-#### Method 2: Use Debug Mode
-Enable Debug mode in your IDE, select "Output" → "MCP Log" to see the Web UI URL:
-
-![Debug Mode Port View](../images/ssh-remote-debug-port.png)
-
-### Step 4: Open in Local Browser
-
-1. Copy the URL (usually `http://localhost:8765` or another port)
-2. Paste and open in your local browser
-3. Start using the Web UI for feedback
-
-## Port Forwarding Setup
+## 2. Port forwarding from your laptop
 
 ### VS Code Remote SSH
-1. Press `Ctrl+Shift+P` in VS Code
-2. Type "Forward a Port"
-3. Enter the port number (default 8765)
-4. Access `http://localhost:8765` in your local browser
 
-### Cursor SSH Remote
-1. Check Cursor's port forwarding settings
-2. Manually add port forwarding rule (port 8765)
-3. Access the forwarded port in your local browser
+1. `Ctrl/Cmd+Shift+P` → `Forward a Port`;
+2. Enter `8765`;
+3. Open `http://localhost:8765/` in your local browser.
 
-## Important Reminders
+![Port Settings](../images/ssh-remote-port-setting.png)
+![Connect URL](../images/ssh-remote-connect-url.png)
 
-### ⚠️ Do Not Start Manually
-**Do NOT** manually execute commands like `uvx mcp-feedback-enhanced test --web`, as this cannot integrate with the MCP system.
+### Cursor Remote
 
-### ✅ Correct Process
-1. Wait for AI model to call MCP tool
-2. System automatically starts Web UI
-3. Check port forwarding or Debug logs
-4. Open corresponding URL in local browser
+1. Open the Ports panel (Command Palette → `Toggle Ports`);
+2. Add forwarding rule for `8765`;
+3. Open `http://localhost:8765/` locally.
 
-## Frequently Asked Questions
+### Plain SSH command line
 
-### Q: Why can't the browser launch automatically in SSH Remote environment?
-A: SSH Remote environment is headless with no graphical interface, so browsers cannot be launched directly. You need to access through port forwarding in your local browser.
+```bash
+ssh -L 8765:127.0.0.1:8765 user@remote-host
+# then on your local browser: http://localhost:8765/
+```
 
-### Q: How to confirm if Web UI started successfully?
-A: Check IDE's Debug output or MCP Log. If you see "Web UI started" message, it means successful startup.
+## 3. `mcp.json` on the Agent side
 
-### Q: What if the port is occupied?
-A: Modify the port number in MCP settings, or wait for the system to automatically select another available port.
+Your AI agent (Cursor IDE) runs **locally** and needs to reach the MCP
+endpoint. With SSH forwarding this is straightforward:
 
-### Q: Can't find port forwarding settings?
-A: Check your SSH Remote tool documentation, or use Debug mode to view the URL in MCP Log.
+```json
+{
+  "mcpServers": {
+    "mcp-feedback-enhanced": {
+      "url": "http://127.0.0.1:8765/mcp/",
+      "autoApprove": ["interactive_feedback"]
+    }
+  }
+}
+```
 
-### Q: Why am I not receiving new MCP feedback?
-A: There might be a WebSocket connection issue. **Solution**: Simply refresh the browser page to re-establish the WebSocket connection.
+The trailing `/` is required.
 
-### Q: Why isn't MCP being called?
-A: Please confirm the MCP tool status shows green light (indicating normal operation). **Solution**:
-- Check the MCP tool status indicator in your IDE
-- If not green, try toggling the MCP tool on/off repeatedly
-- Wait a few seconds for the system to reconnect
+## 4. First-run smoke test
 
-### Q: Why can't Augment start MCP?
-A: Sometimes errors may prevent the MCP tool from showing green status. **Solution**:
-- Completely close and restart VS Code or Cursor
-- Reopen the project
-- Wait for MCP tool to reload and show green light
+```bash
+# On your local laptop, after SSH forwarding is up
+curl http://localhost:8765/api/all-sessions
+# → {"sessions":[]}
+curl -s http://localhost:8765/ | head -n 5
+# → HTML page
+```
 
-## v2.3.0 Improvements
+If both succeed, send a message from Cursor that triggers
+`interactive_feedback`. A new card should appear in the sidebar of
+`http://localhost:8765/`.
 
-Improvements for SSH Remote environments in this version:
-- ✅ Automatic SSH Remote environment detection
-- ✅ Clear guidance when browser cannot launch
-- ✅ Display correct access URL
-- ✅ Improved error messages and solution suggestions
+## 5. FAQ
 
-## Related Resources
+**Q: Should I still set `MCP_WEB_HOST=0.0.0.0`?**
+A: No. That env var was a v2.x workaround for "auto-launched browser
+on remote cannot reach local". In v3.0 just pass `--host 0.0.0.0` to
+`serve` if you actually need to bind all interfaces (Option B above).
 
-- [Main Documentation](../../README.md)
+**Q: The daemon says "address already in use".**
+A: Another `mcp-feedback-enhanced` process or an unrelated service is
+using 8765. Either stop it (`lsof -i :8765` → kill the PID), or pass
+`--port 18765` and forward that port instead.
+
+**Q: PID lock says daemon is already running but I can't find the
+process.**
+A: Stale lock. Delete the file and retry:
+
+```bash
+rm ~/.config/mcp-feedback-enhanced/daemon.pid
+uvx mcp-feedback-enhanced serve --http
+```
+
+**Q: My agent keeps connecting to port 8765 on the laptop but the
+daemon is on the server — nothing happens.**
+A: SSH port forwarding is not actually active. Re-check §2, and verify
+with `curl http://localhost:8765/api/all-sessions` from the laptop
+before launching the AI call.
+
+**Q: Can the daemon survive when I disconnect SSH?**
+A: Not with plain `uvx ... serve --http` because `Ctrl+C` / SIGHUP on
+disconnect kills the foreground process. Use `tmux` / `screen` / `nohup`
+if you want it to persist across sessions:
+
+```bash
+tmux new -d -s mcp-feedback 'uvx mcp-feedback-enhanced serve --http'
+```
+
+v3.0 deliberately does not ship LaunchAgent / systemd templates
+(design decision §7.14 in
+[multi-session-http-redesign.md](../../architecture/multi-session-http-redesign.md)).
+
+**Q: Can I share one daemon across multiple users on the same remote
+box?**
+A: Not recommended. The PID lock is per-user (`~/.config/...`), but
+you'd share the session list across people — privacy hazard. Spin up
+one daemon per user on different ports.
+
+**Q: WebSocket shows "disconnected" in the browser console after a
+Wi-Fi blip.**
+A: The page auto-reconnects. If it doesn't, reload the tab — session
+state is held server-side and comes back via `sessions_snapshot`.
+
+---
+
+**Related**:
+- [Phase 2: HTTP Daemon Usage Guide](../../architecture/phase2-http-daemon-usage.md)
+- [Phase 3: Multi-Session UI Usage Guide](../../architecture/phase3-multi-session-ui-usage.md)
+- [Cache Management](../cache-management.md)

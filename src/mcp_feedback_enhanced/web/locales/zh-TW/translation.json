@@ -1,11 +1,11 @@
 {
     "app": {
-        "title": "MCP Feedback Enhanced",
+        "title": "MCP Interactive Feedback (HTTP fork)",
         "subtitle": "AI 輔助開發回饋收集器",
-        "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
-        "author": "作者：Fábio Ferreira (原作者) / Minidoracat (增強版)",
-        "authorLink": "GitHub: Minidoracat",
-        "credits": "⭐ 如果這個專案對您有幫助，請在 GitHub 上給我們一個星星！\n\n本增強版本由 Minidoracat 開發和維護，大幅擴展了專案功能，新增了 Web UI 介面、圖片支援、多語言能力以及許多其他改進功能。\n\n同時感謝 sanshao85 的 mcp-feedback-collector 專案提供的 UI 設計靈感。\n\n開源協作讓技術變得更美好！",
+        "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 HTTP daemon + 單實例多會話 + 3 層 UI Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
+        "author": "作者：0xlane (MCP Feedback Enhanced HTTP fork)",
+        "authorLink": "GitHub: 0xlane",
+        "credits": "⭐ 如果這個專案對您有幫助，請在 GitHub 上給我們一個星星！\n\n本 HTTP fork 版本由 0xlane 重寫傳輸層為 HTTP daemon + 單實例多會話 + 3 層 UI 架構，為個人自用而開發。\n\n原始概念和重複功能來自上游 Minidoracat/mcp-feedback-enhanced 專案，該 fork 僅僅重新組裝了這些零件。\n\n開源協作讓技術變得更美好！",
         "projectDirectory": "專案目錄",
         "clickToCopyPath": "點擊複製完整路徑",
         "clickToCopySessionId": "點擊複製完整會話ID",
@@ -467,14 +467,15 @@
     },
     "about": {
         "title": "ℹ️ 關於",
-        "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
+        "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 HTTP daemon + 單實例多會話 + 3 層 UI Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
         "appInfo": "應用程式資訊",
         "version": "版本",
         "projectLinks": "專案連結",
         "githubProject": "GitHub 專案",
         "visitGithub": "訪問 GitHub",
         "thanks": "致謝與貢獻",
-        "thanksText": "感謝原作者 Fábio Ferreira (@fabiomlferreira) 創建了原始的 interactive-feedback-mcp 專案。\n\n本增強版本由 Minidoracat 開發和維護，大幅擴展了專案功能，新增了 Web UI 介面、圖片支援、多語言能力以及許多其他改進功能。\n\n同時感謝 sanshao85 的 mcp-feedback-collector 專案提供的 UI 設計靈感。\n\n開源協作讓技術變得更美好！"
+        "thanksText": "本 HTTP fork 版本由 0xlane 重寫傳輸層為 HTTP daemon + 單實例多會話 + 3 層 UI 架構。\n\n原始概念和重複功能來自上游 Minidoracat/mcp-feedback-enhanced 專案，該 fork 僅僅重新組裝了這些零件。\n\n開源協作讓技術變得更美好！"
+    },
     },
     "images": {
         "settings": {

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-MCP Feedback Enhanced Desktop Application
-=========================================
+MCP Interactive Feedback (HTTP fork) Desktop Application
+========================================================
 
-基於 Tauri 的桌面應用程式包裝器，為 MCP Feedback Enhanced 提供原生桌面體驗。
+基於 Tauri 的桌面應用程式包裝器，為 MCP Interactive Feedback（HTTP fork）提供原生桌面體驗。
 
 主要功能：
 - 原生桌面應用程式界面
@@ -11,13 +11,12 @@ MCP Feedback Enhanced Desktop Application
 - 跨平台支援（Windows、macOS、Linux）
 - 無需瀏覽器的獨立運行環境
 
-作者: Minidoracat
-版本: 2.4.3
+作者: 0xlane (MCP Feedback Enhanced HTTP fork)
+版本: 3.0.0
 """
 
-__version__ = "2.4.3"
-__author__ = "Minidoracat"
-__email__ = "minidora0702@gmail.com"
+__version__ = "3.0.0"
+__author__ = "0xlane"
 
 from .desktop_app import DesktopApp, launch_desktop_app
 

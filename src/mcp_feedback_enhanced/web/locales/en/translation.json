@@ -465,14 +465,14 @@
     },
     "about": {
         "title": "ℹ️ About",
-        "description": "A powerful MCP server that provides human-in-the-loop feedback functionality for AI-assisted development tools. Features a Web UI interface with rich capabilities including image upload, command execution, and multi-language support.",
+        "description": "A powerful MCP server that provides human-in-the-loop feedback functionality for AI-assisted development tools. Features HTTP daemon + single-instance multi-session + 3-layer UI Web UI interface, with rich capabilities including image upload, command execution, and multi-language support.",
         "appInfo": "Application Information",
         "version": "Version",
         "projectLinks": "Project Links",
         "githubProject": "GitHub Project",
         "visitGithub": "Visit GitHub",
         "thanks": "Thanks & Contributions",
-        "thanksText": "Thanks to the original author Fábio Ferreira (@fabiomlferreira) for creating the original interactive-feedback-mcp project.\n\nThis enhanced version is developed and maintained by Minidoracat, greatly expanding the project functionality with Web UI interface, image support, multi-language capabilities, and many other improvements.\n\nSpecial thanks to sanshao85's mcp-feedback-collector project for UI design inspiration.\n\nOpen source collaboration makes technology better!"
+        "thanksText": "This HTTP fork version rewrote the transport layer as HTTP daemon + single-instance multi-session + 3-layer UI architecture by 0xlane.\n\nOriginal concepts and duplicated functionality come from upstream Minidoracat/mcp-feedback-enhanced project; this fork just reassembles those pieces.\n\nOpen source collaboration makes technology better!"
     },
     "images": {
         "settings": {

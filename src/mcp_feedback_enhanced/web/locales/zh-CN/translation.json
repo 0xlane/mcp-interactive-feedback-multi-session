@@ -462,14 +462,14 @@
     },
     "about": {
         "title": "ℹ️ 关于",
-        "description": "一个强大的 MCP 服务器，为 AI 辅助开发工具提供人在回路的互动反馈功能。支持 Web UI 界面，并具备图片上传、命令执行、多语言等丰富功能。",
+        "description": "一个强大的 MCP 服务器，为 AI 辅助开发工具提供人在回路的互动反馈功能。支持 HTTP daemon + 单实例多会话 + 3 层 UI Web UI 界面，并具备图片上传、命令执行、多语言等丰富功能。",
         "appInfo": "应用程序信息",
         "version": "版本",
         "projectLinks": "项目链接",
         "githubProject": "GitHub 项目",
         "visitGithub": "访问 GitHub",
         "thanks": "致谢与贡献",
-        "thanksText": "感谢原作者 Fábio Ferreira (@fabiomlferreira) 创建了原始的 interactive-feedback-mcp 项目。\n\n本增强版本由 Minidoracat 开发和维护，大幅扩展了项目功能，新增了 Web UI 界面、图片支持、多语言能力以及许多其他改进功能。\n\n同时感谢 sanshao85 的 mcp-feedback-collector 项目提供的 UI 设计灵感。\n\n开源协作让技术变得更美好！"
+        "thanksText": "本 HTTP fork 版本由 0xlane 重写传输层为 HTTP daemon + 单实例多会话 + 3 层 UI 架构。\n\n原始概念和重复功能来自上游 Minidoracat/mcp-feedback-enhanced 项目，该 fork 仅仅重新组装了这些零件。\n\n开源协作让技术变得更美好！"
     },
     "images": {
         "settings": {

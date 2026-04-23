@@ -55,35 +55,28 @@ def setup_routes(manager: "WebUIManager"):
 
     @manager.app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
-        """統一回饋頁面 - 重構後的主頁面"""
-        # 獲取當前活躍會話
-        current_session = manager.get_current_session()
+        """統一回饋殼頁面 - Phase 3 多會話模式
 
-        if not current_session:
-            # 沒有活躍會話時顯示等待頁面
-            return manager.templates.TemplateResponse(
-                request,
-                "index.html",
-                {
-                    "title": "MCP Feedback Enhanced",
-                    "has_session": False,
-                    "version": __version__,
-                },
-            )
-
-        # 有活躍會話時顯示回饋頁面
-        # 載入用戶的佈局模式設定
+        無論是否有活躍會話，``/`` 都返回同一個 ``feedback.html`` 殼（SPA）；
+        會話內容由前端通過 ``/api/sessions`` + ``/ws sessions_snapshot`` 動態載入。
+        舊的 ``index.html``「等待會話」頁面在 Phase 3 下由 ``feedback.html`` 的空態
+        占位區接管，不再需要後端雙模板分支。
+        """
         layout_mode = load_user_layout_settings()
+        current_session = manager.get_current_session()
 
         return manager.templates.TemplateResponse(
             request,
             "feedback.html",
             {
-                "project_directory": current_session.project_directory,
-                "summary": current_session.summary,
+                # 若有活躍會話，仍把初始字段直接塞進模板，讓首屏在 JS 還沒接管之前
+                # 就能看到基本信息；否則給空串，由前端在 sessions_snapshot 到來後填充。
+                "project_directory": current_session.project_directory if current_session else "",
+                "summary": current_session.summary if current_session else "",
+                "session_id": current_session.session_id if current_session else "",
                 "title": "Interactive Feedback - 回饋收集",
                 "version": __version__,
-                "has_session": True,
+                "has_session": current_session is not None,
                 "layout_mode": layout_mode,
             },
         )
@@ -869,6 +862,25 @@ async def handle_websocket_message_mux(
             )
         except Exception as e:  # noqa: BLE001
             debug_log(f"推送 sessions_snapshot 失敗: {e}")
+        return
+
+    if message_type == "set_active_session":
+        # 前端在側欄點擊切換 session 時通知後端同步 _active_session_id。
+        # 這樣 /api/current-session 等老接口返回的會是「用戶當前查看」的會話，
+        # 避免 refreshPageContent 把 UI 切回後端最新創建的那個。
+        target_sid = data.get("session_id")
+        if target_sid and target_sid in manager.sessions:
+            manager._active_session_id = target_sid
+            debug_log(f"[WS] 活躍會話已被前端切換為: {target_sid}")
+        try:
+            await websocket.send_json(
+                {
+                    "type": "active_session_ack",
+                    "session_id": manager._active_session_id,
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"發送 active_session_ack 失敗: {e}")
         return
 
     # ------- 以下類型需要目標 session -------

@@ -154,13 +154,14 @@ def test_get_sessions_api_returns_snapshot(mux_manager, test_project_dir):
 
         ids = [s["session_id"] for s in payload["sessions"]]
         assert set(ids) == {sid1, sid2}
-        # 最新建的在前
+        # 排序：最新建的在前
         assert payload["sessions"][0]["session_id"] == sid2
-        assert payload["active_session_id"] == sid2
-        # 只有 sid2 是當前
+        # Phase 3 粘滯語義：活躍指針仍是第一個建立的 sid1
+        assert payload["active_session_id"] == sid1
+        # 只有 sid1 是當前
         is_current_map = {s["session_id"]: s["is_current"] for s in payload["sessions"]}
-        assert is_current_map[sid2] is True
-        assert is_current_map[sid1] is False
+        assert is_current_map[sid1] is True
+        assert is_current_map[sid2] is False
 
 
 def test_delete_sessions_by_status_requires_status(mux_manager):
@@ -308,10 +309,9 @@ def test_archive_via_ws_message_broadcasts(mux_manager, test_project_dir):
             assert saw_archived, "未收到 session_archived 廣播"
             assert saw_ack, "未收到 session_archive_ack 回執"
 
-    assert mux_manager.sessions[sid].status in {
-        SessionStatus.CANCELED,
-        SessionStatus.COMPLETED,
-    }
+    # Phase 3：歸檔 = 從 manager.sessions 物理移除。刷新後 snapshot 也不會再
+    # 把它推回前端，避免「清除已完成 → 刷新又回來」的 UX bug。
+    assert sid not in mux_manager.sessions
 
 
 def test_ws_get_sessions_snapshot_on_demand(mux_manager, test_project_dir):
@@ -339,25 +339,29 @@ def test_ws_get_sessions_snapshot_on_demand(mux_manager, test_project_dir):
 
 
 def test_ws_message_routed_by_session_id(mux_manager, test_project_dir):
-    """消息中的 ``session_id`` 應把事件路由到目標會話而非活躍會話。"""
-    sid_bg = mux_manager.create_session(str(test_project_dir), "背景任務")
+    """消息中的 ``session_id`` 應把事件路由到目標會話而非活躍會話。
+
+    Phase 3 粘滯語義：``sid_active``（第一個建立的）會是活躍會話，
+    ``sid_newer`` 雖然後建但活躍指針並不會被它搶走。我們故意用
+    ``archive_session`` 作用到「非活躍」的那個（``sid_newer``），
+    驗證路由確實是按 ``session_id`` 走而不是打到活躍會話上。
+    """
     sid_active = mux_manager.create_session(str(test_project_dir), "活躍任務")
+    sid_newer = mux_manager.create_session(str(test_project_dir), "後建任務")
     assert mux_manager._active_session_id == sid_active
 
     with TestClient(mux_manager.app) as client:
         with client.websocket_connect("/ws?lang=zh-TW") as ws:
             _drain_initial(ws)
 
-            # 歸檔背景任務（非活躍會話），必須憑 session_id 才能命中
-            ws.send_json({"type": "archive_session", "session_id": sid_bg})
+            # 歸檔「後建但非活躍」的會話：必須憑 session_id 才能正確命中
+            ws.send_json({"type": "archive_session", "session_id": sid_newer})
 
-            _wait_for_type(ws, "session_archived", session_id=sid_bg)
+            _wait_for_type(ws, "session_archived", session_id=sid_newer)
 
-    # 驗證：背景任務被歸檔，活躍任務完好
-    assert mux_manager.sessions[sid_bg].status in {
-        SessionStatus.CANCELED,
-        SessionStatus.COMPLETED,
-    }
+    # 驗證：後建任務被歸檔（物理移除），活躍任務完好
+    assert sid_newer not in mux_manager.sessions
+    assert sid_active in mux_manager.sessions
     assert mux_manager.sessions[sid_active].status not in {
         SessionStatus.CANCELED,
         SessionStatus.COMPLETED,

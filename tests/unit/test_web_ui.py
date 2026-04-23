@@ -39,19 +39,24 @@ class TestWebUIManager:
         assert current_session.summary == TestData.SAMPLE_SESSION["summary"]
 
     def test_session_switching(self, web_ui_manager, test_project_dir):
-        """測試會話切換"""
+        """Phase 3：多會話並存，活躍指針粘滯在第一個建立的會話。"""
         # 創建第一個會話
-        web_ui_manager.create_session(str(test_project_dir), "第一個會話")
+        session_id_1 = web_ui_manager.create_session(
+            str(test_project_dir), "第一個會話"
+        )
 
         # 創建第二個會話
         session_id_2 = web_ui_manager.create_session(
             str(test_project_dir), "第二個會話"
         )
 
-        # 驗證當前會話是最新的
+        # Phase 3 粘滯語義：新建 session_id_2 不會把活躍指針搶走
         current_session = web_ui_manager.get_current_session()
-        assert current_session.session_id == session_id_2
-        assert current_session.summary == "第二個會話"
+        assert current_session.session_id == session_id_1
+        assert current_session.summary == "第一個會話"
+
+        # session_id_2 也在字典中，等待前端主動切過去
+        assert session_id_2 in web_ui_manager.sessions
 
     def test_global_tabs_management(self, web_ui_manager):
         """測試全局標籤頁管理"""

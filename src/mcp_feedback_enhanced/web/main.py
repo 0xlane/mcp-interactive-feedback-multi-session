@@ -169,6 +169,10 @@ class WebUIManager:
         self.sessions: dict[str, WebFeedbackSession] = {}
         # _active_session_id：前端目前顯示的會話 id（由 current_session property 存取）
         self._active_session_id: str | None = None
+        # _creation_seq：WebUIManager 為每個 session 分配的單調遞增序號，
+        # 用於 ``build_sessions_snapshot`` 在 ``created_at`` 同毫秒時的 tie-breaker。
+        self._creation_seq: int = 0
+        self._session_creation_order: dict[str, int] = {}
 
         # 階段 3：多路復用 WebSocket 連接註冊表
         # 一個瀏覽器 Tab 一條 /ws 連接，會話事件通過 session_id 路由（由前端按 id 分派）。
@@ -412,20 +416,22 @@ class WebUIManager:
     ) -> str:
         """創建新的回饋會話 - 多會話模式：純插入，不銷毀舊會話。
 
-        階段 1 行為：
+        Phase 3 行為：
         - 新會話建立並加入 ``self.sessions`` 字典；
-        - ``_active_session_id`` 指向新會話（前端視覺上「切」到新會話）；
+        - ``_active_session_id`` 不會被新會話強制覆寫：只有在「目前沒有活躍會
+          話指針」或「舊指針指向的會話已不存在」時才把新會話設為活躍，避免
+          使用者在前端查看舊會話時被強制切走；前端要顯示新會話，請透過側欄
+          點擊或 Cmd-1..9 快捷鍵主動切換；
         - 舊活躍會話保持原狀態（WAITING / ACTIVE / FEEDBACK_SUBMITTED 等），
           其 ``wait_for_feedback`` 仍在阻塞，可被使用者手動歸檔（archive）或
-          正常走完流程，亦可被後續的超時/過期機制清理；
-        - 舊活躍會話若持有 WebSocket，將其轉移給新會話（保持前端單視圖平滑切換）。
+          正常走完流程，亦可被後續的超時/過期機制清理。
+
+        註：HTTP 多工模式下事件廣播統一走 ``manager.broadcast``，因此不再把
+        舊會話的 per-session websocket 搬到新會話上（該欄位只對 run_command
+        等老介面還有意義，保持各自原本的引用即可）。
         """
-        # 保存舊活躍會話的 WebSocket 引用，用於轉移
+        # 取舊活躍會話：用於合併 active_tabs + 判斷是否保留 active 指針
         old_session = self.current_session
-        old_websocket = None
-        if old_session and old_session.websocket:
-            old_websocket = old_session.websocket
-            debug_log("保存舊會話的 WebSocket 連接以轉移到新會話")
 
         # 創建新會話
         session_id = str(uuid.uuid4())
@@ -440,9 +446,26 @@ class WebUIManager:
         # 將全局標籤頁狀態繼承到新會話
         session.active_tabs = self.global_active_tabs.copy()
 
-        # 加入會話字典並設為活躍
+        # 加入會話字典
         self.sessions[session_id] = session
-        self._active_session_id = session_id
+        self._creation_seq += 1
+        self._session_creation_order[session_id] = self._creation_seq
+
+        # 只有在「目前沒有活躍會話指針」或「舊指針指向的會話已不存在」時才把
+        # 新會話設為活躍，避免使用者正在看舊會話時被強制切走。
+        prior_active_valid = (
+            self._active_session_id is not None
+            and self._active_session_id in self.sessions
+            and self._active_session_id != session_id
+        )
+        if not prior_active_valid:
+            self._active_session_id = session_id
+            debug_log(f"無有效舊活躍會話，將新會話設為活躍: {session_id}")
+        else:
+            debug_log(
+                "保留既有活躍會話指針 "
+                f"{self._active_session_id}，前端可主動切到新會話 {session_id}"
+            )
 
         debug_log(
             f"創建新會話: {session_id}（目前活躍會話總數: "
@@ -451,17 +474,9 @@ class WebUIManager:
         )
         debug_log(f"繼承 {len(session.active_tabs)} 個活躍標籤頁")
 
-        # WebSocket 轉移（相容前端單視圖行為）
-        if old_websocket:
-            # 舊會話不再持有該 WebSocket（避免兩個會話同時往同一個 socket 寫）
-            if old_session is not None:
-                old_session.websocket = None
-            session.websocket = old_websocket
-            debug_log("已將舊 WebSocket 連接轉移到新會話")
-        else:
-            # 無舊連接：標記待發送 session_updated 通知（由 /ws 或 smart_open_browser 消費）
-            self._pending_session_update = True
-            debug_log("沒有舊 WebSocket 連接，設置待更新標記")
+        # 標記待發送 session_updated 通知（HTTP 多工模式下事件走 broadcast，
+        # 不需要搶舊會話的 per-session websocket）
+        self._pending_session_update = True
 
         return session_id
 
@@ -479,6 +494,7 @@ class WebUIManager:
             session = self.sessions[session_id]
             session.cleanup()
             del self.sessions[session_id]
+            self._session_creation_order.pop(session_id, None)
 
             if self._active_session_id == session_id:
                 self._active_session_id = None
@@ -495,6 +511,7 @@ class WebUIManager:
         if session is not None:
             session.cleanup()
             self.sessions.pop(session_id, None)
+        self._session_creation_order.pop(session_id, None)
         self._active_session_id = None
         debug_log(f"已清空當前活躍會話: {session_id}")
 
@@ -505,12 +522,25 @@ class WebUIManager:
     ) -> bool:
         """用戶主動歸檔（取消）指定會話。
 
-        - 若會話仍在 WAITING / ACTIVE，呼叫 ``session.cancel()`` 讓阻塞中的
-          ``wait_for_feedback`` 解鎖並返回空結果，對應的 MCP tool 呼叫會得到
-          「用戶取消了反饋」的返回；
-        - 若會話已在終態或 FEEDBACK_SUBMITTED，僅視作 UI 層歸檔，不做狀態變動；
-        - 如歸檔的是目前活躍會話，活躍指針自動讓出（指向字典中最新的非終態會話
-          或 None）。
+        歸檔 = 「從後端字典中真正移除該會話」，而不只是 UI 層擦除：
+
+        - 若會話尚未送出反饋且未進入終態（WAITING / ACTIVE），先呼叫
+          ``session.cancel()`` 讓阻塞中的 ``wait_for_feedback`` 解鎖並通過
+          CANCELED 分支返回空結果，對應的 MCP tool 呼叫會得到「用戶取消了反饋」
+          的返回；
+        - 無論會話當前處於何種狀態（含 FEEDBACK_SUBMITTED、CANCELED、
+          COMPLETED 等），都會執行同步 ``session.cleanup()``（冪等）並把它從
+          ``self.sessions`` 中 ``pop`` 出去。這樣下一次 ``sessions_snapshot``
+          就不會再把已歸檔的會話推回前端，避免「清除已完成 → 刷新後又回來」的
+          UX bug；
+        - 如歸檔的是目前活躍會話，活躍指針自動讓出（指向字典中最新的非終態
+          會話或 None）。
+
+        注意事項：
+        - 對仍在 ``wait_for_feedback`` 的會話，我們在 pop dict 之前已把
+          ``_cleanup_done`` 置為 True，外部協程醒來後會跳過 async 清理鏈並
+          正常返回空 dict，不會因 dict 條目消失而崩潰（協程已持有 session
+          對象引用）。
 
         Returns:
             bool: True 表示會話存在且被處理；False 表示會話不存在。
@@ -520,21 +550,30 @@ class WebUIManager:
             debug_log(f"歸檔失敗：找不到會話 {session_id}")
             return False
 
-        if session.is_active():
-            session.cancel(message)
-        else:
-            debug_log(
-                f"歸檔會話 {session_id}（當前狀態 {session.status.value}，僅 UI 層標記）"
-            )
+        previous_status = session.status.value
+        was_active = self._active_session_id == session_id
 
-        # 如果歸檔的是活躍會話，嘗試把活躍指針轉給另一個非終態會話
-        if self._active_session_id == session_id:
+        if session.is_active() and not session.feedback_completed.is_set():
+            session.cancel(message)
+
+        try:
+            session.cleanup()
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"歸檔：同步清理會話 {session_id} 失敗（忽略）: {e}")
+
+        self.sessions.pop(session_id, None)
+        self._session_creation_order.pop(session_id, None)
+
+        if was_active:
             fallback_id = self._select_fallback_active_session(exclude_id=session_id)
             self._active_session_id = fallback_id
             debug_log(
                 f"活躍會話讓出，新的活躍會話: {fallback_id if fallback_id else '無'}"
             )
 
+        debug_log(
+            f"歸檔會話 {session_id} 已從後端移除（原狀態 {previous_status}）"
+        )
         return True
 
     def _select_fallback_active_session(
@@ -649,7 +688,9 @@ class WebUIManager:
     def build_sessions_snapshot(self) -> list[dict]:
         """構建所有會話的全量快照，供 ``sessions_snapshot`` 事件或 ``/api/sessions`` 使用。
 
-        字段與 ``/api/all-sessions`` 對齊，按創建時間降序。
+        字段與 ``/api/all-sessions`` 對齊，按創建時間降序。同毫秒內創建的會話
+        使用內部遞增序號 ``_session_creation_order`` 作為 tie-breaker，
+        保證穩定的「後建立的排前面」順序（避免測試/UI 在高頻率創建下抖動）。
         """
         snapshot: list[dict] = []
         for session_id, session in self.sessions.items():
@@ -666,9 +707,12 @@ class WebUIManager:
                     "feedback_completed": session.feedback_completed.is_set(),
                     "is_current": session_id == self._active_session_id,
                     "user_messages": session.user_messages,
+                    "_seq": self._session_creation_order.get(session_id, 0),
                 }
             )
-        snapshot.sort(key=lambda x: x["created_at"], reverse=True)
+        snapshot.sort(key=lambda x: (x["created_at"], x["_seq"]), reverse=True)
+        for item in snapshot:
+            item.pop("_seq", None)
         return snapshot
 
     async def broadcast_session_event(
@@ -1345,9 +1389,11 @@ async def launch_web_feedback_ui(
     """
     manager = get_web_ui_manager()
 
-    # 創建新會話（每次AI調用都創建新會話，多會話並存）
+    # 創建新會話（每次 AI 調用都創建新會話，多會話並存）
+    # 注意：Phase 3 起 create_session 採用粘滯活躍指針，因此取目標會話
+    # 必須用 session_id 精確定位，不能用 get_current_session（那是前端在看的）
     session_id = manager.create_session(project_directory, summary, title=title)
-    session = manager.get_current_session()
+    session = manager.get_session(session_id)
 
     if not session:
         raise RuntimeError("無法創建回饋會話")
@@ -1379,17 +1425,18 @@ async def launch_web_feedback_ui(
         debug_log(f"廣播 session_created 失敗（不影響會話等待）: {e}")
 
     # Daemon 模式：外層由 mcp_feedback_enhanced.daemon 管理 uvicorn，
-    # 此處僅創建會話、通知既有標籤頁，不再自啟伺服器或打開新瀏覽器視窗。
+    # 此處僅創建會話並依賴前面已發出的 ``session_created`` 廣播通知前端，
+    # 不再自啟伺服器或打開新瀏覽器視窗。
     if manager.is_daemon:
         debug_log("Daemon 模式：跳過 start_server/smart_open_browser")
-        has_connected_tab = False
-        try:
-            has_connected_tab = await manager.notify_existing_tab_to_refresh()
-        except Exception as e:  # noqa: BLE001 - 通知失敗不影響等待
-            debug_log(f"Daemon 模式通知既有標籤頁失敗（可略）：{e}")
-        if not has_connected_tab:
+        connected_count = len(manager.connections)
+        if connected_count == 0:
             debug_log(
                 f"Daemon 模式：目前無活躍標籤頁，用戶可手動訪問 {manager.get_server_url()}"
+            )
+        else:
+            debug_log(
+                f"Daemon 模式：已向 {connected_count} 條活躍連接廣播 session_created"
             )
     else:
         # 啟動伺服器（如果尚未啟動）

@@ -7,7 +7,8 @@
 
 1. 並發建立多個會話，全部進入 ``sessions`` 字典且不互相干擾；
 2. 舊會話在新會話建立後，狀態、feedback_completed、等待任務都保持不變；
-3. 僅最新建立的會話為活躍會話（``current_session`` 指向它）；
+3. 活躍指針（``current_session``）在多會話並存下採「粘滯」策略：新會話到達時**不會**強制切走使用者正在看的舊會話，
+   只有在舊指針為空 / 指向已移除會話時才會把新會話設為活躍；
 4. 單一會話 ``submit_feedback`` 不會解鎖其他會話的 ``wait_for_feedback``；
 5. 手動歸檔（cancel_session）能解鎖 ``wait_for_feedback`` 並返回空 dict，
    上層 ``interactive_feedback`` tool 據此返回「用戶取消了反饋」；
@@ -38,19 +39,26 @@ class TestMultiSessionBackend:
         assert sid2 in web_ui_manager.sessions
         assert sid3 in web_ui_manager.sessions
 
-    def test_only_latest_session_is_current(self, web_ui_manager, test_project_dir):
-        """活躍指針永遠指向最新建立的會話，舊會話不變為終態。"""
+    def test_first_session_stays_active_when_new_arrives(
+        self, web_ui_manager, test_project_dir
+    ):
+        """新會話到達時，活躍指針仍停在第一個未歸檔的會話（Phase 3 粘滯語義）。
+
+        這樣避免使用者正在看舊會話時，AI agent 開了一個新會話就把 UI 頁
+        強制切走。前端需要時可以透過側欄或 Cmd-1..9 主動切換。
+        """
         sid1 = web_ui_manager.create_session(str(test_project_dir), "任務 1")
         sid2 = web_ui_manager.create_session(str(test_project_dir), "任務 2")
 
         current = web_ui_manager.get_current_session()
         assert current is not None
-        assert current.session_id == sid2
+        assert current.session_id == sid1
 
-        # 舊會話狀態必須保持 WAITING，不被強制推進
-        s1 = web_ui_manager.sessions[sid1]
-        assert s1.status == SessionStatus.WAITING
-        assert not s1.feedback_completed.is_set()
+        # 兩個會話都保持 WAITING，不被強制推進
+        assert web_ui_manager.sessions[sid1].status == SessionStatus.WAITING
+        assert web_ui_manager.sessions[sid2].status == SessionStatus.WAITING
+        assert not web_ui_manager.sessions[sid1].feedback_completed.is_set()
+        assert not web_ui_manager.sessions[sid2].feedback_completed.is_set()
 
     def test_title_field_is_stored(self, web_ui_manager, test_project_dir):
         """title 參數會被原樣保存到 session 上，可選。"""
@@ -68,7 +76,8 @@ class TestMultiSessionBackend:
         sid2 = web_ui_manager.create_session(str(test_project_dir), "任務 2")
 
         assert web_ui_manager.current_session is not None
-        assert web_ui_manager.current_session.session_id == sid2
+        # Phase 3：新建 sid2 不會覆寫活躍指針，仍是最先建立的 sid1
+        assert web_ui_manager.current_session.session_id == sid1
 
         web_ui_manager.current_session = None
         assert web_ui_manager.current_session is None
@@ -76,8 +85,15 @@ class TestMultiSessionBackend:
         assert sid1 in web_ui_manager.sessions
         assert sid2 in web_ui_manager.sessions
 
-    def test_old_session_websocket_transfer(self, web_ui_manager, test_project_dir):
-        """建立新會話時，舊活躍會話的 WebSocket 轉移給新會話，且舊會話不再持有。"""
+    def test_new_session_does_not_steal_old_websocket(
+        self, web_ui_manager, test_project_dir
+    ):
+        """Phase 3：HTTP 多工模式下，新會話不會把舊會話的 per-session websocket 搶走。
+
+        事件廣播走 ``manager.broadcast`` 全通道下發，前端按 ``session_id`` 過濾；
+        per-session ``websocket`` 欄位只對 ``run_command`` 等老介面還有意義，
+        保持各自原本的引用即可。
+        """
 
         class _FakeWS:
             pass
@@ -88,8 +104,8 @@ class TestMultiSessionBackend:
 
         sid2 = web_ui_manager.create_session(str(test_project_dir), "任務 2")
 
-        assert web_ui_manager.sessions[sid1].websocket is None
-        assert web_ui_manager.sessions[sid2].websocket is ws
+        assert web_ui_manager.sessions[sid1].websocket is ws
+        assert web_ui_manager.sessions[sid2].websocket is None
 
 
 class TestSessionCancellation:
@@ -120,21 +136,27 @@ class TestSessionCancellation:
     def test_cancel_active_session_transfers_current_pointer(
         self, web_ui_manager, test_project_dir
     ):
-        """歸檔當前活躍會話時，活躍指針轉移到字典中其他非終態會話。"""
+        """歸檔當前活躍會話時，活躍指針轉移到字典中其他非終態會話。
+
+        語義：``cancel_session`` 相當於「永久歸檔」，會話會從 ``sessions``
+        字典中真正移除（避免刷新後 ``sessions_snapshot`` 又把它推回前端）。
+        Phase 3 粘滯語義下，sid1 是初始活躍會話；歸檔 sid1 後指針應轉移到 sid2。
+        """
         sid1 = web_ui_manager.create_session(str(test_project_dir), "任務 1")
         sid2 = web_ui_manager.create_session(str(test_project_dir), "任務 2")
 
         assert web_ui_manager.current_session is not None
-        assert web_ui_manager.current_session.session_id == sid2
+        assert web_ui_manager.current_session.session_id == sid1
 
-        ok = web_ui_manager.cancel_session(sid2)
+        ok = web_ui_manager.cancel_session(sid1)
         assert ok
 
         current_after = web_ui_manager.current_session
         assert current_after is not None
-        assert current_after.session_id == sid1
-        # sid2 仍然在 sessions 字典中，但狀態為 CANCELED
-        assert web_ui_manager.sessions[sid2].status == SessionStatus.CANCELED
+        assert current_after.session_id == sid2
+        # sid1 已經被從 sessions 字典中物理移除
+        assert sid1 not in web_ui_manager.sessions
+        assert sid2 in web_ui_manager.sessions
 
     def test_cancel_last_active_session_clears_pointer(
         self, web_ui_manager, test_project_dir
@@ -150,17 +172,16 @@ class TestSessionCancellation:
         assert web_ui_manager.cancel_session("nonexistent-session-id") is False
 
     @pytest.mark.asyncio
-    async def test_cancel_submitted_session_is_noop(
+    async def test_cancel_submitted_session_removes_from_store(
         self, web_ui_manager, test_project_dir
     ):
-        """歸檔已送出反饋的會話應為 no-op：狀態不變，session.cancel() 返回 False。
+        """歸檔已送出反饋的會話：狀態不回退，但會從 sessions 字典中物理移除。
 
-        ``submit_feedback`` 會把狀態推進到 ``FEEDBACK_SUBMITTED``（WAITING 起點時
-        自動補一次流轉）。``feedback_completed.is_set()`` 也會在此時被觸發。
-
-        ``WebUIManager.cancel_session`` 返回值表達的是「會話存在且已被處理」，
-        它仍返回 True；精確的「是否改變狀態」由 ``session.cancel()`` 的返回值
-        反映，這裡直接調用底層方法再驗一遍。
+        ``submit_feedback`` 會把狀態推進到 ``FEEDBACK_SUBMITTED``。對於已經
+        進入終態的會話，``session.cancel()`` 仍會返回 False（因為不會把
+        FEEDBACK_SUBMITTED 再回退成 CANCELED），但 ``WebUIManager.cancel_session``
+        會把整條 session 從字典中 pop 掉 —— 這是 Phase 3 為了修「清除已完成
+        後刷新又回來」bug 的關鍵行為。
         """
         sid = web_ui_manager.create_session(str(test_project_dir), "已提交的任務")
         session = web_ui_manager.sessions[sid]
@@ -168,13 +189,12 @@ class TestSessionCancellation:
         await session.submit_feedback("ok", [], {})
         assert session.feedback_completed.is_set()
         assert session.status == SessionStatus.FEEDBACK_SUBMITTED
-        status_before_cancel = session.status
 
-        # manager 層：會話存在，視作已處理（由 UI 刷新列表即可）
         ok = web_ui_manager.cancel_session(sid)
         assert ok is True
-        assert session.status == status_before_cancel
-        # 底層 session.cancel() 應明確返回 False（未改動狀態）
+        # sid 已從字典中移除，即使狀態是 FEEDBACK_SUBMITTED
+        assert sid not in web_ui_manager.sessions
+        # 底層 session.cancel() 對終態 session 仍返回 False（未重置為 CANCELED）
         assert session.cancel() is False
 
 
@@ -200,6 +220,38 @@ class TestConcurrentFeedbackIsolation:
         assert s2.feedback_completed.is_set()
         assert s2.status == SessionStatus.FEEDBACK_SUBMITTED
         assert s2.feedback_result == "已提交任務 2"
+
+    @pytest.mark.asyncio
+    async def test_session_lookup_by_id_after_sticky_active(
+        self, web_ui_manager, test_project_dir
+    ):
+        """回歸測試：粘滯活躍指針下，create_session 之後必須用 session_id 找新會話。
+
+        這是 Phase 3 曾經踩過的雷：``launch_web_feedback_ui`` 以前是
+        ``session = manager.get_current_session()`` ——在粘滯語義下，它會返回
+        舊活躍會話而非新建的那個，導致新會話的 ``wait_for_feedback`` 其實在
+        等舊會話的 feedback_completed，最終兩個 MCP 調用拿到**同一份**反饋。
+        這裡用精確的 ``get_session(new_sid)`` 來鎖定目標，不能被
+        ``current_session`` 遮蔽。
+        """
+        sid_old = web_ui_manager.create_session(str(test_project_dir), "舊任務")
+        sid_new = web_ui_manager.create_session(str(test_project_dir), "新任務")
+
+        # 粘滯語義：current 仍是 sid_old
+        assert web_ui_manager.get_current_session().session_id == sid_old
+        # 但按 id 精確查找能拿到新會話
+        target_new = web_ui_manager.get_session(sid_new)
+        assert target_new is not None
+        assert target_new.session_id == sid_new
+        assert target_new.summary == "新任務"
+
+        # 對新會話提交反饋，舊會話必須仍處於 WAITING
+        await target_new.submit_feedback("只給新任務的反饋", [], {})
+        old_session = web_ui_manager.get_session(sid_old)
+        assert old_session is not None
+        assert not old_session.feedback_completed.is_set()
+        assert old_session.status == SessionStatus.WAITING
+        assert target_new.feedback_result == "只給新任務的反饋"
 
 
 class TestSessionStatusEnum:

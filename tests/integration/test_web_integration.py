@@ -155,14 +155,20 @@ class TestWebUISessionManagement:
             str(test_project_dir), "第二個會話"
         )
 
-        # 當前會話應該切換到新會話
+        # Phase 3 粘滯語義：新會話不會把活躍指針搶走，仍指向第一個
         current_session = web_ui_manager.get_current_session()
-        assert current_session.session_id == session_id_2
-        assert current_session.summary == "第二個會話"
+        assert current_session.session_id == session_id
+        assert current_session.summary == "第一個會話"
 
-        # 3. 測試會話狀態更新：next_step 走 WAITING → ACTIVE → FEEDBACK_SUBMITTED
+        # 第二個會話存在於字典中且為 WAITING，等待前端主動切換
         from mcp_feedback_enhanced.web.models import SessionStatus
 
+        assert session_id_2 in web_ui_manager.sessions
+        assert (
+            web_ui_manager.sessions[session_id_2].status == SessionStatus.WAITING
+        )
+
+        # 3. 測試會話狀態更新：next_step 走 WAITING → ACTIVE → FEEDBACK_SUBMITTED
         current_session.next_step("會話已啟動")
         current_session.next_step("已提交回饋")
         assert current_session.status == SessionStatus.FEEDBACK_SUBMITTED
@@ -326,6 +332,9 @@ class TestWebUIPerformance:
             f"每個會話創建時間過長: {avg_time_per_session:.3f}秒"
         )
 
-        # 驗證最後一個會話是當前活躍會話
+        # Phase 3 粘滯語義：活躍指針仍然指向第一個建立的會話
         current_session = web_ui_manager.get_current_session()
-        assert current_session.session_id == session_ids[-1]
+        assert current_session.session_id == session_ids[0]
+        # 所有後續建立的會話都存在於字典中
+        for sid in session_ids:
+            assert sid in web_ui_manager.sessions

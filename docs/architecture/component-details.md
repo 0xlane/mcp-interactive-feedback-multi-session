@@ -279,6 +279,11 @@ class SessionStatus(Enum):
 根模板：`web/templates/feedback.html`（SPA 外壳）。静态资源位于
 `web/static/js/` 与 `web/static/css/`。
 
+根模板 `feedback.html` 的结构也被 v3.0 重排为 **3 层信息架构**——顶栏
+放应用级按钮（设定 / 关于），左栏放会话列表 + 底部的「会话历史」入口，
+右侧 Tab 栏**只保留真正会话级**的内容（工作区 / AI 摘要 / 命令）。
+详细使用见 [`phase3-multi-session-ui-usage.md §3`](./phase3-multi-session-ui-usage.md)。
+
 | 模块 | 职责 |
 | --- | --- |
 | `app.js` | 应用入口，串起 WS、session-store、UI manager、侧栏、提交流程；维护 `_drafts` 每会话草稿、`_lastActiveSessionId` 切换跟踪、`_syncFeedbackStateToSession` 后端状态映射 |
@@ -288,12 +293,22 @@ class SessionStatus(Enum):
 | `modules/notify-badge.js` | 标题 `(N)` 前缀、Canvas 画 favicon 红点、`Notification` 系统弹窗；`Cmd/Ctrl+1..9` 按 `created_at DESC` 切换会话，顺序与侧栏一致；`MutationObserver` 守护标题前缀不被其他代码覆盖 |
 | `modules/ui-manager.js` | 表单禁用/启用、按钮文案；识别 `FEEDBACK_NO_SESSION` 态；与 `app._setFeedbackFormDisabled` 协同 |
 | `modules/utils.js` | 常量/工具；新增 `FEEDBACK_NO_SESSION` |
+| `modules/app-shell-modal.js` | **v3.0 新增**。声明式应用模态开关器：`[data-modal-open]` / `[data-modal-dismiss]` 属性即可驱动模态开关；Esc/backdrop 关闭；同一时刻只开一个；`body.app-modal-open` 锁页面滚动。暴露 `open/close/closeAll/getCurrent` 4 个 API 供脚本使用 |
+| `modules/connection-monitor.js` | 连接状态监控（连接时长、重连次数、消息数、延迟）。v3.0 起直接读 `MCPFeedback.sessionStore` 计算会话数与当前状态，并启动 1 秒 display ticker，让统计面板不会因为没有事件到来而冻结 |
 | `modules/image-handler.js` · `modules/file-upload-manager.js` | 图片/文件上传、粘贴板兼容 |
-| `modules/tab-manager.js` · `modules/settings-manager.js` · `modules/connection-monitor.js` · `modules/audio` · `modules/prompt` · `modules/session` · `modules/session-manager.js` · `modules/logger.js` · `modules/constants` · `modules/utils` · `modules/textarea-height-manager.js` | 其他功能/兼容模块，沿用 v2.x 设计 |
+| `modules/tab-manager.js` · `modules/settings-manager.js` · `modules/audio` · `modules/prompt` · `modules/session` · `modules/session-manager.js` · `modules/logger.js` · `modules/constants` · `modules/utils` · `modules/textarea-height-manager.js` | 其他功能/兼容模块，沿用 v2.x 设计 |
 
-前端新增 CSS：`web/static/css/session-sidebar.css`（侧栏样式、pending
-圆点、WAITING 脉冲动画等）。
+前端 CSS 变动：
+
+- `web/static/css/session-sidebar.css` — 侧栏样式、pending 圆点、
+  WAITING 脉冲动画，以及 v3.0 新增的 `.sidebar-footer` / `.sidebar-footer-btn`
+  底部「会话历史」按钮样式。
+- `web/static/css/styles.css` — v3.0 新增通用应用模态样式
+  （`.app-modal` / `.modal-backdrop` / `.modal-content` 等，含淡入/滑入
+  动画）、顶栏图标按钮（`.topbar-actions` / `.topbar-icon-btn`）、
+  工作区小图标按钮（`.section-header-actions` / `.btn-icon-sm`）。
+- `body.app-modal-open` 配合 `AppShellModal` 锁定页面滚动。
 
 ---
 
-**文档版本**：v3.0.0-dev · **最后更新**：2026-04-22
+**文档版本**：v3.0.0-dev · **最后更新**：2026-04-23

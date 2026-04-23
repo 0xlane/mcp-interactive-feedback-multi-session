@@ -42,6 +42,17 @@ uv run python -m mcp_feedback_enhanced serve --http
 
 ## 3. 界面导览
 
+> UI 按 **3 层信息架构**组织，目的是把「应用全局」「跨会话浏览」「当前
+> 会话工作」这三种视图分清楚，避免让人误以为每个会话都带一份独立设定：
+>
+> | 层级 | 位置 | 放什么 |
+> |---|---|---|
+> | 应用全局 | 顶栏右上 | `⚙️ 设定` / `ℹ️ 关于` 图标按钮 → 模态 |
+> | 跨会话浏览 | 左侧边栏 | 会话列表 + 底部 `📊 会话历史` 按钮 → 模态（历史 + 今日统计） |
+> | 当前会话 | 右侧 Tab | `📝 工作区` / `📋 AI 摘要` / `⚡ 命令` |
+>
+> 任何全局动作都走模态，不占用 Tab 栏；Tab 栏 **只**保留真正会话级的内容。
+
 ### 3.1 侧栏（左）
 
 ```
@@ -91,9 +102,36 @@ uv run python -m mcp_feedback_enhanced serve --http
 - 侧栏顶部的 `‹` / `›` 图标切换折叠状态；
 - 折叠状态会存在 `localStorage["mcp.sidebar.collapsed"]`，刷新后保留。
 
-### 3.3 详情（右）
+### 3.3 顶栏与侧栏底部的模态入口
 
-右栏就是原来 `feedback.html` 的那套 UI（项目路径、summary、输入、
+顶栏（`.connection-monitor-bar.compact` 右侧）与侧栏底部都是**声明式**
+模态触发器——HTML 上打 `data-modal-open="<modalId>"`，由
+`modules/app-shell-modal.js` 统一处理开关。
+
+| 入口 | 模态 | 内容 |
+|---|---|---|
+| 顶栏 `⚙️ 设定` | `#settingsModal` | 介面设定（主题、布局、超时等） |
+| 顶栏 `ℹ️ 关于` | `#aboutModal` | 版本、GitHub、致谢 |
+| 侧栏底部 `📊 会话历史` | `#sessionsModal` | 历史会话列表 + 今日统计 |
+
+交互语义：点击 backdrop 或 `Esc` 即可关闭；一次只开一个模态——打开新
+模态会自动关闭上一个；打开后 `body.app-modal-open` 锁住页面滚动。
+
+### 3.4 详情（右）
+
+右栏 Tab 栏现在只剩 3 个真正会话级的视图：`📝 工作区` / `📋 AI 摘要`
+/ `⚡ 命令`。`会话管理` / `设定` / `关于` 三个全局动作已经拆到顶栏
+和侧栏底部的模态里（见 §3.3）。
+
+`📝 工作区` Tab 的 AI 摘要区块右上角提供了两个小图标按钮：
+
+- `📋 复制会话内容`（`#copyCurrentSessionContent`）
+- `📝 复制用户内容`（`#copyCurrentUserContent`）
+
+按钮 ID 保留自 v2.x 的「会话管理」Tab，`session-manager.js` 的事件绑
+定逻辑完全不需要改——位置变了但行为一致。
+
+右栏其余就是原来 `feedback.html` 的那套 UI（项目路径、summary、输入、
 图片上传、命令执行、提交按钮）。Phase 3 的区别：
 
 | 场景 | 表单状态 |
@@ -231,18 +269,44 @@ MCPFeedback.sessionStore.getActiveSessionId();
 MCPFeedback.sessionStore.clearPending('<session_id>');
 ```
 
-### 8.3 Cache buster
+### 8.3 程序化控制应用模态
 
-改完 `app.js` / `websocket-manager.js` / `session-sidebar.js` 等静态
-文件之后，别忘了同步 bump `src/.../web/templates/feedback.html` 里对
-应 `<script src="...?v=YYYYMMDDNN">` 的 `v=` 参数——已经启动 daemon
-的用户如果不 bump 版本号，浏览器会拉旧缓存，看不到你的修改。
+`window.MCPFeedback.AppShellModal` 是 `app-shell-modal.js` 暴露的小
+API，写脚本自测或写 E2E 时很有用：
+
+```javascript
+// 打开某个模态
+MCPFeedback.AppShellModal.open('settingsModal');
+MCPFeedback.AppShellModal.open('aboutModal');
+MCPFeedback.AppShellModal.open('sessionsModal');
+
+// 关闭
+MCPFeedback.AppShellModal.close('settingsModal');
+
+// 关闭全部
+MCPFeedback.AppShellModal.closeAll();
+
+// 当前开着哪个？未开时返回 null
+MCPFeedback.AppShellModal.getCurrent();
+```
+
+日常用户不需要用这个 API，声明式 `data-modal-open` / `data-modal-dismiss`
+属性就够了（见 §3.3）。
+
+### 8.4 Cache buster
+
+改完 `app.js` / `websocket-manager.js` / `session-sidebar.js` /
+`app-shell-modal.js` 等静态文件之后，别忘了同步 bump
+`src/.../web/templates/feedback.html` 里对应 `<script src="...?v=YYYYMMDDNN">`
+的 `v=` 参数——已经启动 daemon 的用户如果不 bump 版本号，浏览器会拉
+旧缓存，看不到你的修改。
 
 ## 9. 已知限制 / 待办
 
 | 项 | 状态 | 规划 |
 |---|---|---|
 | 侧栏折叠状态 `localStorage` 持久化 | ✅ 已做 | — |
+| 3 层信息架构（顶栏设定/关于、侧栏底部会话历史、Tab 栏仅会话级） | ✅ 已做 | §3.3 |
 | 归档二次确认弹窗（仅 WAITING/ACTIVE 会话） | ⏳ 未做 | 阶段 4 |
 | 会话历史（超过保留期后的回看界面） | ⏳ 未做 | 阶段 4/5 |
 | 音效通知 Phase 3 没接线 | ⏳ 未做 | 阶段 4/5 可选 |

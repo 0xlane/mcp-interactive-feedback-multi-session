@@ -471,10 +471,6 @@
         "projectLinks": "Project Links",
         "githubProject": "GitHub Project",
         "visitGithub": "Visit GitHub",
-        "contact": "Contact & Support",
-        "discordSupport": "Discord Support",
-        "joinDiscord": "Join Discord",
-        "contactDescription": "For technical support, issue reports, or feature suggestions, please contact us through Discord community or GitHub Issues.",
         "thanks": "Thanks & Contributions",
         "thanksText": "Thanks to the original author Fábio Ferreira (@fabiomlferreira) for creating the original interactive-feedback-mcp project.\n\nThis enhanced version is developed and maintained by Minidoracat, greatly expanding the project functionality with Web UI interface, image support, multi-language capabilities, and many other improvements.\n\nSpecial thanks to sanshao85's mcp-feedback-collector project for UI design inspiration.\n\nOpen source collaboration makes technology better!"
     },

@@ -2,7 +2,6 @@
     "app": {
         "title": "MCP Feedback Enhanced",
         "subtitle": "AI 輔助開發回饋收集器",
-        "version": "v2.2.5",
         "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
         "author": "作者：Fábio Ferreira (原作者) / Minidoracat (增強版)",
         "authorLink": "GitHub: Minidoracat",
@@ -474,10 +473,6 @@
         "projectLinks": "專案連結",
         "githubProject": "GitHub 專案",
         "visitGithub": "訪問 GitHub",
-        "contact": "聯繫與支援",
-        "discordSupport": "Discord 支援",
-        "joinDiscord": "加入 Discord",
-        "contactDescription": "如需技術支援、問題回報或功能建議，歡迎透過 Discord 社群或 GitHub Issues 與我們聯繫。",
         "thanks": "致謝與貢獻",
         "thanksText": "感謝原作者 Fábio Ferreira (@fabiomlferreira) 創建了原始的 interactive-feedback-mcp 專案。\n\n本增強版本由 Minidoracat 開發和維護，大幅擴展了專案功能，新增了 Web UI 介面、圖片支援、多語言能力以及許多其他改進功能。\n\n同時感謝 sanshao85 的 mcp-feedback-collector 專案提供的 UI 設計靈感。\n\n開源協作讓技術變得更美好！"
     },

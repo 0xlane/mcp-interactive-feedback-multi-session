@@ -468,10 +468,6 @@
         "projectLinks": "项目链接",
         "githubProject": "GitHub 项目",
         "visitGithub": "访问 GitHub",
-        "contact": "联系与支持",
-        "discordSupport": "Discord 支持",
-        "joinDiscord": "加入 Discord",
-        "contactDescription": "如需技术支持、问题反馈或功能建议，欢迎通过 Discord 社群或 GitHub Issues 与我们联系。",
         "thanks": "致谢与贡献",
         "thanksText": "感谢原作者 Fábio Ferreira (@fabiomlferreira) 创建了原始的 interactive-feedback-mcp 项目。\n\n本增强版本由 Minidoracat 开发和维护，大幅扩展了项目功能，新增了 Web UI 界面、图片支持、多语言能力以及许多其他改进功能。\n\n同时感谢 sanshao85 的 mcp-feedback-collector 项目提供的 UI 设计灵感。\n\n开源协作让技术变得更美好！"
     },

@@ -2,9 +2,9 @@
 """
 本地發布腳本
 用法：
-  python scripts/release.py patch   # 2.0.0 -> 2.0.1
-  python scripts/release.py minor   # 2.0.0 -> 2.1.0
-  python scripts/release.py major   # 2.0.0 -> 3.0.0
+  python scripts/release.py patch   # 3.0.0 -> 3.0.1
+  python scripts/release.py minor   # 3.0.0 -> 3.1.0
+  python scripts/release.py major   # 3.0.0 -> 4.0.0
 """
 
 import re
@@ -99,7 +99,7 @@ def main():
         run_cmd(f'git push origin "v{new_version}"')
 
         print(f"🎉 發布完成！版本 v{new_version} 已上線")
-        print("📦 安裝命令: uvx mcp-feedback-enhanced")
+        print("📦 安裝命令: uvx mcp-interactive-feedback")
     else:
         print("⏸️  發布已取消，版本已更新但未發布")
         print("💡 您可以稍後手動發布: uv run twine upload dist/*")

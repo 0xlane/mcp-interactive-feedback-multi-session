@@ -9,11 +9,11 @@ on:
         default: 'patch'
         type: choice
         options:
-        - patch    # 2.0.0 -> 2.0.1 (bug fixes, security patches, documentation updates)
-        - minor    # 2.0.0 -> 2.1.0 (new features, enhancements, backward-compatible changes)
-        - major    # 2.0.0 -> 3.0.0 (breaking changes, architecture refactoring, API changes)
+        - patch    # 3.0.0 -> 3.0.1 (bug fixes, security patches, documentation updates)
+        - minor    # 3.0.0 -> 3.1.0 (new features, enhancements, backward-compatible changes)
+        - major    # 3.0.0 -> 4.0.0 (breaking changes, architecture refactoring, API changes)
       custom_version:
-        description: 'Custom version number (e.g., 2.5.0) - overrides version_type if provided'
+        description: 'Custom version number (e.g., 3.1.0) - overrides version_type if provided'
         required: false
         type: string
       platforms:

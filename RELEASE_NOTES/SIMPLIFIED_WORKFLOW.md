@@ -61,7 +61,7 @@ Choosing the appropriate version type is important, select based on the changes:
 
 #### 🔧 Patch (修補版本)
 - **用途 / Usage**: 錯誤修復、小幅改進、安全修補
-- **範例 / Example**: `2.3.0 → 2.3.1`
+- **範例 / Example**: `3.0.0 → 3.0.1`
 - **適用情況 / When to use**:
   - 🐛 修復 bug / Bug fixes
   - 🔒 安全性修補 / Security patches
@@ -70,7 +70,7 @@ Choosing the appropriate version type is important, select based on the changes:
 
 #### ✨ Minor (次要版本)
 - **用途 / Usage**: 新功能、功能增強、向後相容的變更
-- **範例 / Example**: `2.3.0 → 2.4.0`
+- **範例 / Example**: `3.0.0 → 3.1.0`
 - **適用情況 / When to use**:
   - 🆕 新增功能 / New features
   - 🚀 功能增強 / Feature enhancements
@@ -79,7 +79,7 @@ Choosing the appropriate version type is important, select based on the changes:
 
 #### 🚨 Major (主要版本)
 - **用途 / Usage**: 重大變更、不向後相容的修改、架構重構
-- **範例 / Example**: `2.3.0 → 3.0.0`
+- **範例 / Example**: `3.0.0 → 4.0.0`
 - **適用情況 / When to use**:
   - 💥 破壞性變更 / Breaking changes
   - 🏗️ 架構重構 / Architecture refactoring

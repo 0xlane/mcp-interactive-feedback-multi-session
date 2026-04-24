@@ -1,6 +1,6 @@
 {
     "app": {
-        "title": "MCP Interactive Feedback (HTTP fork)",
+        "title": "MCP 互動回饋系統",
         "subtitle": "AI 輔助開發回饋收集器",
         "description": "一個強大的 MCP 伺服器，為 AI 輔助開發工具提供人在回路的互動回饋功能。支援 HTTP daemon + 單實例多會話 + 3 層 UI Web UI 介面，並具備圖片上傳、命令執行、多語言等豐富功能。",
         "author": "作者：0xlane (MCP Feedback Enhanced HTTP fork)",

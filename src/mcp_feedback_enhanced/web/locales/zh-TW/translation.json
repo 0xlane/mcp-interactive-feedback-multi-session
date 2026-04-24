@@ -13,7 +13,9 @@
         "pathCopyFailed": "複製路徑失敗",
         "sessionIdCopied": "會話ID已複製到剪貼板",
         "sessionIdCopyFailed": "複製會話ID失敗",
-        "updateFailed": "更新內容失敗，請手動刷新頁面以查看新的 AI 工作摘要"
+        "updateFailed": "更新內容失敗，請手動刷新頁面以查看新的 AI 工作摘要",
+        "waitingForSession": "等待 MCP 調用建立會話...",
+        "noSessionPlaceholder": "尚無會話可供反饋，等待 MCP 調用中..."
     },
     "tabs": {
         "summary": "📋 AI 摘要",
@@ -212,7 +214,8 @@
         "collapse": "收起側欄",
         "expand": "展開側欄",
         "archive": "歸檔此會話",
-        "empty": "尚無會話\n等待 MCP 調用中..."
+        "empty": "尚無會話\n等待 MCP 調用中...",
+        "defaultTitle": "會話 {id}"
     },
     "sidebar": {
         "sessionHistory": "會話歷史",
@@ -310,7 +313,9 @@
             "projectDirectory": "專案目錄",
             "summary": "摘要",
             "noSummary": "暫無摘要",
-            "unknown": "未知"
+            "unknown": "未知",
+            "inProgress": "進行中",
+            "inProgressSuffix": "(進行中)"
         },
         "noSummary": "無摘要",
         "copySessionContent": "複製會話內容",
@@ -476,7 +481,6 @@
         "thanks": "致謝與貢獻",
         "thanksText": "本 HTTP fork 版本由 0xlane 重寫傳輸層為 HTTP daemon + 單實例多會話 + 3 層 UI 架構。\n\n原始概念和重複功能來自上游 Minidoracat/mcp-feedback-enhanced 專案，該 fork 僅僅重新組裝了這些零件。\n\n開源協作讓技術變得更美好！"
     },
-    },
     "images": {
         "settings": {
             "title": "🖼️ 圖片設定",
@@ -589,7 +593,8 @@
             "testBody": "這是一個測試通知，5秒後將自動關閉",
             "notSupported": "您的瀏覽器不支援通知功能",
             "permissionRequired": "請先授權通知權限",
-            "criticalTitle": "MCP Feedback - 警告"
+            "criticalTitle": "MCP Feedback - 警告",
+            "waitingSuffix": "等待反饋"
         }
     },
     "system": {

@@ -403,7 +403,9 @@
          右側：原有頂欄 + 工作區
     -->
     <div class="app-layout" id="appLayout">
-        <aside class="session-sidebar" id="sessionSidebar" aria-label="會話列表">
+        <aside class="session-sidebar" id="sessionSidebar"
+               data-i18n-aria-label="sessionList.title"
+               aria-label="會話列表">
             <div class="sidebar-header">
                 <div class="sidebar-title" data-i18n="sessionList.title">會話列表</div>
                 <div class="sidebar-stats">
@@ -421,14 +423,18 @@
                             id="sidebarClearDoneBtn"
                             class="sidebar-action-btn"
                             data-i18n-title="sessionList.clearDone"
-                            title="清除已完成">
+                            data-i18n-aria-label="sessionList.clearDone"
+                            title="清除已完成"
+                            aria-label="清除已完成">
                         🧹 <span data-i18n="sessionList.clearDoneLabel">清除已完成</span>
                     </button>
                     <button type="button"
                             id="sidebarToggleBtn"
                             class="sidebar-action-btn sidebar-toggle"
                             data-i18n-title="sessionList.collapse"
+                            data-i18n-aria-label="sessionList.collapse"
                             title="收起側欄"
+                            aria-label="收起側欄"
                             aria-controls="sessionSidebar">
                         ◀
                     </button>
@@ -464,7 +470,9 @@
                 class="sidebar-reopen-btn"
                 aria-controls="sessionSidebar"
                 data-i18n-title="sessionList.expand"
+                data-i18n-aria-label="sessionList.expand"
                 title="展開側欄"
+                aria-label="展開側欄"
                 style="display:none;">
             ▶
         </button>
@@ -509,8 +517,9 @@
             <span id="countdownTimer" class="countdown-timer">--:--</span>
             <button id="countdownPauseBtn" class="countdown-control-btn"
                     data-i18n-title="autoSubmit.pauseCountdown"
+                    data-i18n-aria-label="autoSubmit.pauseCountdown"
                     title="暫停倒數"
-                    aria-label="暫停/恢復倒數">
+                    aria-label="暫停倒數">
                 <span class="pause-icon">⏸</span>
                 <span class="resume-icon" style="display: none;">▶</span>
             </button>
@@ -694,12 +703,14 @@
                                         id="copyCurrentSessionContent"
                                         class="btn-icon-sm"
                                         data-i18n-title="sessionManagement.copySessionContent"
+                                        data-i18n-aria-label="sessionManagement.copySessionContent"
                                         title="複製會話內容"
                                         aria-label="複製會話內容">📋</button>
                                 <button type="button"
                                         id="copyCurrentUserContent"
                                         class="btn-icon-sm"
                                         data-i18n-title="sessionManagement.copyUserContent"
+                                        data-i18n-aria-label="sessionManagement.copyUserContent"
                                         title="複製用戶內容"
                                         aria-label="複製用戶內容">📝</button>
                             </div>
@@ -1247,23 +1258,23 @@
     <!-- Markdown 支援庫 - 本地版本 -->
     <script src="/static/js/vendor/marked.min.js"></script>
     <script src="/static/js/vendor/purify.min.js"></script>
-    <script src="/static/js/i18n.js?v=2025010510"></script>
+    <script src="/static/js/i18n.js?v=2026042402"></script>
     <!-- 載入所有模組 -->
     <!-- 核心模組（最先載入） -->
     <script src="/static/js/modules/logger.js?v=2025010510"></script>
 
     <!-- 工具模組 -->
     <script src="/static/js/modules/utils/dom-utils.js?v=2025010510"></script>
-    <script src="/static/js/modules/utils/time-utils.js?v=2025010510"></script>
+    <script src="/static/js/modules/utils/time-utils.js?v=2026042402"></script>
     <script src="/static/js/modules/utils/status-utils.js?v=2025010510"></script>
 
     <!-- 多會話 Store（Phase 3）- 必須在其它會話模組之前 -->
     <script src="/static/js/modules/session-store.js?v=2025010510"></script>
 
     <!-- 會話管理模組 -->
-    <script src="/static/js/modules/session/session-data-manager.js?v=2025010510"></script>
-    <script src="/static/js/modules/session/session-ui-renderer.js?v=2025010510"></script>
-    <script src="/static/js/modules/session/session-details-modal.js?v=2025010510"></script>
+    <script src="/static/js/modules/session/session-data-manager.js?v=2026042402"></script>
+    <script src="/static/js/modules/session/session-ui-renderer.js?v=2026042402"></script>
+    <script src="/static/js/modules/session/session-details-modal.js?v=2026042402"></script>
 
     <!-- 提示詞管理模組 -->
     <script src="/static/js/modules/prompt/prompt-manager.js?v=2025010510"></script>
@@ -1286,11 +1297,11 @@
     <script src="/static/js/modules/connection-monitor.js?v=2025010519"></script>
     <script src="/static/js/modules/session-manager.js?v=2025010510"></script>
     <!-- 多會話側欄（Phase 3） -->
-    <script src="/static/js/modules/session-sidebar.js?v=2025010519"></script>
+    <script src="/static/js/modules/session-sidebar.js?v=2026042401"></script>
     <!-- 應用外殼模態管理器（Phase 3.1：設定/關於/會話歷史） -->
     <script src="/static/js/modules/app-shell-modal.js?v=2025010520"></script>
     <!-- 多會話通知徽章（title 計數 + favicon 小紅點 + 系統通知 + Cmd/Ctrl+1..9） -->
-    <script src="/static/js/modules/notify-badge.js?v=2025010516"></script>
+    <script src="/static/js/modules/notify-badge.js?v=2026042401"></script>
     <script src="/static/js/modules/file-upload-manager.js?v=2025010510"></script>
     <script src="/static/js/modules/image-handler.js?v=2025010510"></script>
     <script src="/static/js/modules/settings-manager.js?v=2025010510"></script>
@@ -1298,7 +1309,7 @@
     <script src="/static/js/modules/textarea-height-manager.js?v=2025010510"></script>
 
     <!-- 主應用程式 -->
-    <script src="/static/js/app.js?v=2025010516"></script>
+    <script src="/static/js/app.js?v=2026042401"></script>
     <script>
         // 等待所有模組載入完成後再初始化 FeedbackApp
         async function initializeApp() {

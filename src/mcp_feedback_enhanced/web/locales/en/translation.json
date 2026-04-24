@@ -9,7 +9,9 @@
         "pathCopyFailed": "Failed to copy path",
         "sessionIdCopied": "Session ID copied to clipboard",
         "sessionIdCopyFailed": "Failed to copy session ID",
-        "updateFailed": "Failed to update content, please manually refresh the page to view new AI work summary"
+        "updateFailed": "Failed to update content, please manually refresh the page to view new AI work summary",
+        "waitingForSession": "Waiting for MCP to create a session...",
+        "noSessionPlaceholder": "No session available for feedback. Waiting for MCP call..."
     },
     "tabs": {
         "summary": "📋 AI Summary",
@@ -207,7 +209,8 @@
         "collapse": "Collapse sidebar",
         "expand": "Expand sidebar",
         "archive": "Archive this session",
-        "empty": "No sessions yet\nWaiting for MCP calls..."
+        "empty": "No sessions yet\nWaiting for MCP calls...",
+        "defaultTitle": "Session {id}"
     },
     "sidebar": {
         "sessionHistory": "Session History",
@@ -305,7 +308,9 @@
             "projectDirectory": "Project Directory",
             "summary": "Summary",
             "noSummary": "No summary available",
-            "unknown": "Unknown"
+            "unknown": "Unknown",
+            "inProgress": "In progress",
+            "inProgressSuffix": "(in progress)"
         },
         "copySessionContent": "Copy Session Content",
         "copyUserContent": "Copy User Content",
@@ -584,7 +589,8 @@
             "testBody": "This is a test notification, it will close automatically in 5 seconds",
             "notSupported": "Your browser does not support notifications",
             "permissionRequired": "Please grant notification permission first",
-            "criticalTitle": "MCP Feedback - Warning"
+            "criticalTitle": "MCP Feedback - Warning",
+            "waitingSuffix": "Waiting for feedback"
         }
     },
     "system": {

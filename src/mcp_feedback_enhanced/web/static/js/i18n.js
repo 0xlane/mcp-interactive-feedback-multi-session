@@ -236,7 +236,16 @@ class I18nManager {
                 window.feedbackApp.uiManager.updateStatusIndicator();
             }
 
+            if (typeof window.feedbackApp.refreshI18nDynamicContent === 'function') {
+                window.feedbackApp.refreshI18nDynamicContent();
+            }
 
+            // 會話側欄中動態產生的卡片文字（預設標題 / aria-label / 狀態標籤）
+            // 在切換語言後需要強制重繪
+            if (window.feedbackApp.sessionSidebar &&
+                typeof window.feedbackApp.sessionSidebar.render === 'function') {
+                window.feedbackApp.sessionSidebar.render();
+            }
         }
     }
 
@@ -264,14 +273,33 @@ class I18nManager {
             // 重新渲染統計資訊以更新時間單位
             if (window.feedbackApp.sessionManager.dataManager &&
                 window.feedbackApp.sessionManager.uiRenderer) {
+                const renderer = window.feedbackApp.sessionManager.uiRenderer;
+
+                // 語言切換時需要清除渲染快取，否則 renderSessionHistory / renderStats 會因
+                // 「資料長度 / 內容未變」而跳過重繪，導致時間單位等 i18n 文本沒有更新
+                if (renderer.lastRenderedData) {
+                    renderer.lastRenderedData.stats = null;
+                    renderer.lastRenderedData.historyLength = -1;
+                    renderer.lastRenderedData.currentSessionId = null;
+                }
+
                 const stats = window.feedbackApp.sessionManager.dataManager.getStats();
-                window.feedbackApp.sessionManager.uiRenderer.renderStats(stats);
+                renderer.renderStats(stats);
                 console.log('🌐 已更新統計資訊的語言顯示');
-                
+
                 // 重新渲染會話歷史以更新所有動態創建的元素
                 const sessionHistory = window.feedbackApp.sessionManager.dataManager.getSessionHistory();
-                window.feedbackApp.sessionManager.uiRenderer.renderSessionHistory(sessionHistory);
+                renderer.renderSessionHistory(sessionHistory);
                 console.log('🌐 已更新會話歷史的語言顯示');
+
+                // 重新渲染當前會話卡片（時間單位 / 狀態徽章）
+                const currentSession = window.feedbackApp.sessionManager.dataManager.getCurrentSession
+                    ? window.feedbackApp.sessionManager.dataManager.getCurrentSession()
+                    : null;
+                if (currentSession && typeof renderer.renderCurrentSession === 'function') {
+                    renderer.renderCurrentSession(currentSession);
+                    console.log('🌐 已更新當前會話卡片的語言顯示');
+                }
             }
         }
 

@@ -34,7 +34,14 @@
             var s = String(rec.summary).replace(/\s+/g, ' ').trim();
             return s.length > 40 ? s.slice(0, 40) + '…' : s;
         }
-        return '會話 ' + (rec.session_id || '').slice(0, 8);
+        var shortId = (rec.session_id || '').slice(0, 8);
+        try {
+            if (window.i18nManager && typeof window.i18nManager.t === 'function') {
+                var tmpl = window.i18nManager.t('sessionList.defaultTitle', { id: shortId });
+                if (tmpl && tmpl !== 'sessionList.defaultTitle') return tmpl;
+            }
+        } catch (e) { /* ignore */ }
+        return '會話 ' + shortId;
     }
 
     function fmtShortId(sid) {
@@ -345,10 +352,12 @@
         card.setAttribute('role', 'listitem');
         card.setAttribute('tabindex', '0');
 
+        var archiveLabel = safeT('sessionList.archive', '歸檔此會話');
         card.innerHTML =
             '<div class="session-card-actions">' +
               '<button type="button" class="session-card-action-btn" data-action="archive" ' +
-                'title="歸檔此會話" data-i18n-title="sessionList.archive" aria-label="archive">×</button>' +
+                'title="' + archiveLabel + '" data-i18n-title="sessionList.archive" ' +
+                'aria-label="' + archiveLabel + '" data-i18n-aria-label="sessionList.archive">×</button>' +
             '</div>' +
             '<div class="session-card-title"></div>' +
             '<div class="session-card-meta">' +

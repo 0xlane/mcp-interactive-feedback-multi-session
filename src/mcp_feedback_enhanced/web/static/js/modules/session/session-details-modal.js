@@ -64,16 +64,23 @@
     SessionDetailsModal.prototype.formatSessionDetails = function(sessionData) {
         // console.log('🔍 格式化會話詳情:', sessionData);
 
-        // 處理會話 ID - 顯示完整 session ID
-        const sessionId = sessionData.session_id || '未知';
+        const unknownText = window.i18nManager
+            ? window.i18nManager.t('sessionManagement.sessionDetails.unknown')
+            : '未知';
+        const inProgressText = window.i18nManager
+            ? window.i18nManager.t('sessionManagement.sessionDetails.inProgress')
+            : '進行中';
+        const inProgressSuffixText = window.i18nManager
+            ? window.i18nManager.t('sessionManagement.sessionDetails.inProgressSuffix')
+            : '(進行中)';
 
-        // 處理建立時間
+        const sessionId = sessionData.session_id || unknownText;
+
         const createdTime = sessionData.created_at ?
             TimeUtils.formatTimestamp(sessionData.created_at) :
-            '未知';
+            unknownText;
 
-        // 處理持續時間
-        let duration = '進行中';
+        let duration = inProgressText;
         if (sessionData.duration && sessionData.duration > 0) {
             duration = TimeUtils.formatDuration(sessionData.duration);
         } else if (sessionData.created_at && sessionData.completed_at) {
@@ -82,7 +89,7 @@
         } else if (sessionData.created_at) {
             const elapsed = TimeUtils.calculateElapsedTime(sessionData.created_at);
             if (elapsed > 0) {
-                duration = TimeUtils.formatDuration(elapsed) + ' (進行中)';
+                duration = TimeUtils.formatDuration(elapsed) + ' ' + inProgressSuffixText;
             }
         }
 

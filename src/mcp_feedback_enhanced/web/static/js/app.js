@@ -597,7 +597,9 @@
             ta.disabled = !!disabled;
             if (disabled) {
                 ta.setAttribute('data-empty-state', '1');
-                ta.placeholder = '尚無會話可供反饋，等待 MCP 調用中...';
+                ta.placeholder = window.i18nManager
+                    ? window.i18nManager.t('app.noSessionPlaceholder')
+                    : '尚無會話可供反饋，等待 MCP 調用中...';
             } else {
                 ta.removeAttribute('data-empty-state');
                 if (ta.getAttribute('data-original-placeholder')) {
@@ -665,9 +667,12 @@
             pathEl.textContent = '';
             pathEl.setAttribute('data-full-path', '');
         }
+        const waitingText = window.i18nManager
+            ? window.i18nManager.t('app.waitingForSession')
+            : '等待 MCP 調用建立會話...';
         const summaryEls = document.querySelectorAll('#combinedSummaryContent, #summaryContent');
         summaryEls.forEach(function (el) {
-            if (el) el.textContent = '等待 MCP 調用建立會話...';
+            if (el) el.textContent = waitingText;
         });
         const commandOutput = document.querySelector('#commandOutput');
         if (commandOutput) commandOutput.textContent = '';
@@ -680,6 +685,23 @@
             ta.value = '';
         }
         this._setFeedbackFormDisabled(true);
+    };
+
+    /**
+     * 當語言切換時，重新套用空狀態文案（因為 textarea placeholder 與摘要文字
+     * 是在 JS 中動態寫入的，不是由 data-i18n 屬性管理）。
+     */
+    FeedbackApp.prototype.refreshI18nDynamicContent = function () {
+        if (!window.i18nManager) return;
+        const ta = document.querySelector('#combinedFeedbackText');
+        const inEmptyState = ta && ta.getAttribute('data-empty-state') === '1';
+        if (!inEmptyState) return;
+
+        const waitingText = window.i18nManager.t('app.waitingForSession');
+        document.querySelectorAll('#combinedSummaryContent, #summaryContent').forEach(function (el) {
+            if (el) el.textContent = waitingText;
+        });
+        if (ta) ta.placeholder = window.i18nManager.t('app.noSessionPlaceholder');
     };
 
     /**

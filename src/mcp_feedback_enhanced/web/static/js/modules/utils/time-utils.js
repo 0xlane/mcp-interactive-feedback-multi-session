@@ -64,11 +64,17 @@
 
         /**
          * 格式化持續時間（秒）- 支援國際化
+         *
+         * 中日韓文本數字與單位之間不留空格（例如「5 分鐘」視為異常），
+         * 英文則需要空格（"5 minutes" 才是自然的排版）。
+         * 透過 `isCJKLanguage()` 判斷當前語系，輸出對應格式。
          */
         formatDuration: function(seconds) {
+            const sep = this.getUnitSeparator();
+            const unit = (value, unitText) => `${value}${sep}${unitText}`;
+
             if (!seconds || seconds < 0) {
-                const secondsText = this.getTimeUnitText('seconds');
-                return `0${secondsText}`;
+                return unit(0, this.getTimeUnitText('seconds'));
             }
 
             const hours = Math.floor(seconds / 3600);
@@ -80,12 +86,33 @@
             const secondsText = this.getTimeUnitText('seconds');
 
             if (hours > 0) {
-                return `${hours}${hoursText}${minutes > 0 ? minutes + minutesText : ''}`;
+                return minutes > 0
+                    ? unit(hours, hoursText) + ' ' + unit(minutes, minutesText)
+                    : unit(hours, hoursText);
             } else if (minutes > 0) {
-                return `${minutes}${minutesText}${remainingSeconds > 0 ? remainingSeconds + secondsText : ''}`;
-            } else {
-                return `${remainingSeconds}${secondsText}`;
+                return remainingSeconds > 0
+                    ? unit(minutes, minutesText) + ' ' + unit(remainingSeconds, secondsText)
+                    : unit(minutes, minutesText);
             }
+            return unit(remainingSeconds, secondsText);
+        },
+
+        /**
+         * CJK 語系在數字和時間單位之間不需要空格，其他語系需要。
+         */
+        isCJKLanguage: function() {
+            try {
+                const lang = (window.i18nManager && window.i18nManager.getCurrentLanguage)
+                    ? window.i18nManager.getCurrentLanguage()
+                    : (document.documentElement.lang || '');
+                return typeof lang === 'string' && lang.toLowerCase().indexOf('zh') === 0;
+            } catch (e) {
+                return true;
+            }
+        },
+
+        getUnitSeparator: function() {
+            return this.isCJKLanguage() ? '' : ' ';
         },
 
         /**
@@ -130,18 +157,22 @@
                 const daysText = this.getTimeUnitText('days');
                 const agoText = this.getTimeUnitText('ago');
                 const justNowText = this.getTimeUnitText('justNow');
+                const sep = this.getUnitSeparator();
+
+                // 英文的「ago」習慣放在單位之後並與單位以空格分隔（e.g. "5 minutes ago"），
+                // CJK 則是零空格的緊排「5分鐘前」。
+                const withAgo = (value, unitText) => sep
+                    ? `${value}${sep}${unitText}${sep}${agoText}`
+                    : `${value}${unitText}${agoText}`;
 
                 if (diff < 60) {
                     return justNowText;
                 } else if (diff < 3600) {
-                    const minutes = Math.floor(diff / 60);
-                    return `${minutes}${minutesText}${agoText}`;
+                    return withAgo(Math.floor(diff / 60), minutesText);
                 } else if (diff < 86400) {
-                    const hours = Math.floor(diff / 3600);
-                    return `${hours}${hoursText}${agoText}`;
+                    return withAgo(Math.floor(diff / 3600), hoursText);
                 } else {
-                    const days = Math.floor(diff / 86400);
-                    return `${days}${daysText}${agoText}`;
+                    return withAgo(Math.floor(diff / 86400), daysText);
                 }
             } catch (error) {
                 console.warn('相對時間計算失敗:', timestamp, error);
@@ -414,7 +445,11 @@
 
             const aboutText = this.getTimeUnitText('about');
             const minutesText = this.getTimeUnitText('minutes');
-            return `${aboutText} ${estimatedMinutes} ${minutesText}`;
+            const sep = this.getUnitSeparator();
+            // CJK 的習慣是「約 5 分鐘」數字前後都留一個空格（視覺分隔），
+            // 英文則是 "about 5 minutes" 全部以空格分隔。
+            const numSep = sep || ' ';
+            return `${aboutText}${numSep}${estimatedMinutes}${sep}${minutesText}`;
         },
 
         /**

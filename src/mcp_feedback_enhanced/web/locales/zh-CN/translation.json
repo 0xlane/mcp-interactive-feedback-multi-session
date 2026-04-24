@@ -9,7 +9,9 @@
         "pathCopyFailed": "复制路径失败",
         "sessionIdCopied": "会话ID已复制到剪贴板",
         "sessionIdCopyFailed": "复制会话ID失败",
-        "updateFailed": "更新内容失败，请手动刷新页面以查看新的 AI 工作摘要"
+        "updateFailed": "更新内容失败，请手动刷新页面以查看新的 AI 工作摘要",
+        "waitingForSession": "等待 MCP 调用建立会话...",
+        "noSessionPlaceholder": "尚无会话可供反馈，等待 MCP 调用中..."
     },
     "tabs": {
         "summary": "📋 AI 总结",
@@ -208,7 +210,8 @@
         "collapse": "收起侧栏",
         "expand": "展开侧栏",
         "archive": "归档此会话",
-        "empty": "尚无会话\n等待 MCP 调用中..."
+        "empty": "尚无会话\n等待 MCP 调用中...",
+        "defaultTitle": "会话 {id}"
     },
     "sidebar": {
         "sessionHistory": "会话历史",
@@ -306,7 +309,9 @@
             "projectDirectory": "项目目录",
             "summary": "总结",
             "noSummary": "暂无总结",
-            "unknown": "未知"
+            "unknown": "未知",
+            "inProgress": "进行中",
+            "inProgressSuffix": "(进行中)"
         },
         "copySessionContent": "复制会话内容",
         "copyUserContent": "复制用户内容",
@@ -583,7 +588,8 @@
             "testBody": "这是一个测试通知，5秒后将自动关闭",
             "notSupported": "您的浏览器不支持通知功能",
             "permissionRequired": "请先授权通知权限",
-            "criticalTitle": "MCP Feedback - 警告"
+            "criticalTitle": "MCP Feedback - 警告",
+            "waitingSuffix": "等待反馈"
         }
     },
     "system": {

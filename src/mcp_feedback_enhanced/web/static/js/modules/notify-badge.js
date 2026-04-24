@@ -168,7 +168,14 @@
         try {
             var title = rec.title || 'MCP Feedback';
             var body = (rec.summary || '').slice(0, 120);
-            var n = new Notification(title + ' · 等待反饋', {
+            var waitingSuffix = '等待反饋';
+            try {
+                if (window.i18nManager && typeof window.i18nManager.t === 'function') {
+                    var v = window.i18nManager.t('notification.browser.waitingSuffix');
+                    if (v && v !== 'notification.browser.waitingSuffix') waitingSuffix = v;
+                }
+            } catch (e) { /* ignore */ }
+            var n = new Notification(title + ' · ' + waitingSuffix, {
                 body: body,
                 tag: 'mcp-' + rec.session_id,
                 silent: false

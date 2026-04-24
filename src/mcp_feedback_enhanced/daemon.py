@@ -172,6 +172,7 @@ def serve_http(
             log_level=log_level,
             access_log=False,
             ws="auto",
+            timeout_graceful_shutdown=0,
         )
         server = uvicorn.Server(config)
         server.run()

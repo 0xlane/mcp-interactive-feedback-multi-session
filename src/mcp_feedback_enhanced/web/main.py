@@ -1398,7 +1398,9 @@ async def launch_web_feedback_ui(
 
     if feedback_session_id:
         existing = manager.get_session(feedback_session_id)
-        if existing and not existing.is_active():
+        if existing and existing.status not in (
+            SessionStatus.WAITING, SessionStatus.ACTIVE,
+        ):
             debug_log(
                 f"復用 session {feedback_session_id}（上一輪狀態={existing.status.value}）"
             )
@@ -1406,7 +1408,9 @@ async def launch_web_feedback_ui(
             session = existing
             reused = True
         else:
-            reason = "仍在等待中" if (existing and existing.is_active()) else "不存在"
+            reason = (
+                f"狀態={existing.status.value}" if existing else "不存在"
+            )
             debug_log(
                 f"無法復用 session {feedback_session_id}（{reason}），將建立新 session"
             )

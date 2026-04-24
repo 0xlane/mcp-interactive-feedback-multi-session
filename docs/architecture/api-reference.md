@@ -41,11 +41,13 @@ Daemon 启动后，FastMCP 将以 Streamable HTTP 传输挂在 `/mcp/`。Agent �
 | `summary` | `string` | *必填* | 本次反馈的上下文/问题描述；会直接渲染到 UI |
 | `timeout` | `int` | `600` | 最长等待反馈秒数；到时 `wait_for_feedback` 抛 `TimeoutError`，UI 上该会话转 `TIMEOUT` |
 | `title` | `string?` | `None` | 会话标题；强烈建议填写，侧栏/标题栏/快捷键都靠它识别 |
+| `feedback_session_id` | `string?` | `None` | 上一轮工具返回中的 session ID；传入后同一对话的多轮反馈复用同一个前端会话 |
 
 返回值：`list[TextContent | ImageContent]`，内容依次是：
 
 1. 一段可读的 summary 文本（包含用户提交的自由文本、操作日志）；
-2. 零到多个 `ImageContent`（PNG/JPEG，mimetype 透出）。
+2. 零到多个 `ImageContent`（PNG/JPEG，mimetype 透出）；
+3. 一段 `TextContent`，格式为 `[feedback_session_id=<UUID>]`，供下轮调用传回以复用 session。
 
 失败/取消情形：
 

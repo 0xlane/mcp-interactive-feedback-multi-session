@@ -443,6 +443,16 @@ async def interactive_feedback(
             )
         ),
     ] = None,
+    feedback_session_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "上一輪工具回傳中的 feedback_session_id（可選）。"
+                "傳入後同一對話的多輪回饋會復用同一個前端會話，而非每次建立新的。"
+                "首次呼叫時省略即可。"
+            )
+        ),
+    ] = None,
 ) -> list:
     """Interactive feedback collection tool for LLM agents.
 
@@ -453,12 +463,14 @@ async def interactive_feedback(
     4. Only when the user explicitly indicates "end" or "no more interaction needed" can you stop calling this tool, and the process is considered complete.
     5. You should summarize what have done, and provide project directory through args to let user know what you have done to provide feedback for next step.
     6. When working on multiple parallel tasks (e.g., multiple Cursor Chats), pass a concise `title` (5-15 chars, e.g. "修復登錄重定向") so the user can distinguish sessions in the sidebar.
+    7. The tool response includes a `feedback_session_id`. Pass it back on subsequent calls so the UI reuses the same session instead of creating a new one each time.
 
     Args:
         project_directory: Project directory path for context
         summary: Summary of AI work completed for user review
         timeout: Timeout in seconds for waiting user feedback (default: 600 seconds)
         title: Optional short session title for multi-session sidebar display
+        feedback_session_id: Session ID from a previous tool response; enables session reuse
 
     Returns:
         list: List containing TextContent and MCPImage objects representing user feedback
@@ -496,7 +508,8 @@ async def interactive_feedback(
         debug_log(f"回饋模式: web，超時時間: {effective_timeout} 秒，標題: {title!r}")
 
         result = await launch_web_feedback_ui(
-            project_directory, summary, effective_timeout, title=title
+            project_directory, summary, effective_timeout,
+            title=title, feedback_session_id=feedback_session_id,
         )
 
         # 處理取消情況（使用者手動歸檔會讓 wait_for_feedback 返回空 dict）
@@ -532,6 +545,16 @@ async def interactive_feedback(
                 TextContent(type="text", text="用戶未提供任何回饋內容。")
             )
 
+        # 附帶 feedback_session_id 供下一輪調用復用 session
+        returned_sid = result.get("feedback_session_id", "")
+        if returned_sid:
+            feedback_items.append(
+                TextContent(
+                    type="text",
+                    text=f"[feedback_session_id={returned_sid}]",
+                )
+            )
+
         debug_log(f"回饋收集完成，共 {len(feedback_items)} 個項目")
         return feedback_items
 
@@ -555,6 +578,7 @@ async def launch_web_feedback_ui(
     summary: str,
     timeout: int,
     title: str | None = None,
+    feedback_session_id: str | None = None,
 ) -> dict:
     """
     啟動 Web UI 收集回饋，支援自訂超時時間和會話標題
@@ -564,6 +588,7 @@ async def launch_web_feedback_ui(
         summary: AI 工作摘要
         timeout: 超時時間（秒）
         title: 會話標題（可選）
+        feedback_session_id: 上一輪的 session ID（可選），用於復用 session
 
     Returns:
         dict: 收集到的回饋資料（空 dict 表示使用者取消）
@@ -574,7 +599,10 @@ async def launch_web_feedback_ui(
         # 使用新的 web 模組
         from .web import launch_web_feedback_ui as web_launch
 
-        return await web_launch(project_dir, summary, timeout, title=title)
+        return await web_launch(
+            project_dir, summary, timeout,
+            title=title, feedback_session_id=feedback_session_id,
+        )
     except ImportError as e:
         # 使用統一錯誤處理
         error_id = ErrorHandler.log_error_with_context(

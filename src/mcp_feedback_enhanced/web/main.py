@@ -1374,6 +1374,7 @@ async def launch_web_feedback_ui(
     summary: str,
     timeout: int = 600,
     title: str | None = None,
+    feedback_session_id: str | None = None,
 ) -> dict:
     """
     啟動 Web 回饋介面並等待用戶回饋 - 重構為使用根路徑
@@ -1383,46 +1384,74 @@ async def launch_web_feedback_ui(
         summary: AI 工作摘要
         timeout: 超時時間（秒）
         title: 會話標題（可選），由 AI 傳入用於側欄識別
+        feedback_session_id: 上一輪返回的 session ID（可選）。同一對話
+            多輪調用傳入相同的 ID 即可復用同一個前端 session 而非建立新的。
 
     Returns:
         dict: 回饋結果，包含 logs、interactive_feedback 和 images
     """
     manager = get_web_ui_manager()
 
-    # 創建新會話（每次 AI 調用都創建新會話，多會話並存）
-    # 注意：Phase 3 起 create_session 採用粘滯活躍指針，因此取目標會話
-    # 必須用 session_id 精確定位，不能用 get_current_session（那是前端在看的）
-    session_id = manager.create_session(project_directory, summary, title=title)
-    session = manager.get_session(session_id)
+    # ---- session 復用判斷 ----
+    reused = False
+    session = None
+
+    if feedback_session_id:
+        existing = manager.get_session(feedback_session_id)
+        if existing and not existing.is_active():
+            debug_log(
+                f"復用 session {feedback_session_id}（上一輪狀態={existing.status.value}）"
+            )
+            existing.reset_for_reuse(summary, title)
+            session = existing
+            reused = True
+        else:
+            reason = "仍在等待中" if (existing and existing.is_active()) else "不存在"
+            debug_log(
+                f"無法復用 session {feedback_session_id}（{reason}），將建立新 session"
+            )
+
+    if session is None:
+        session_id = manager.create_session(project_directory, summary, title=title)
+        session = manager.get_session(session_id)
 
     if not session:
         raise RuntimeError("無法創建回饋會話")
 
-    # 階段 3：向所有已連接的瀏覽器 Tab 廣播「新會話建立」事件，讓側欄即時
-    # 插入新卡片 + 提醒用戶。若當前無連接（用戶還沒開瀏覽器），廣播會無聲
-    # 返回，後續靠 smart_open_browser 開新窗 + 連接建立時的 sessions_snapshot
-    # 補上全量。
-    try:
-        await manager.broadcast(
-            {
-                "type": "session_created",
-                "session": {
-                    "session_id": session.session_id,
-                    "project_directory": session.project_directory,
-                    "summary": session.summary,
-                    "title": session.title,
-                    "status": session.status.value,
-                    "status_message": session.status_message,
-                    "created_at": int(session.created_at * 1000),
-                    "last_activity": int(session.last_activity * 1000),
-                    "feedback_completed": False,
-                    "is_current": True,
-                    "user_messages": [],
-                },
-            }
-        )
-    except Exception as e:  # noqa: BLE001
-        debug_log(f"廣播 session_created 失敗（不影響會話等待）: {e}")
+    # 把 feedback_session_id 記錄到 session，讓返回值能帶回給 AI
+    session.feedback_session_id = session.session_id
+
+    # ---- 廣播 ----
+    if reused:
+        try:
+            await manager.broadcast_session_event(
+                "session_updated", session.session_id,
+                summary=session.summary,
+            )
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"廣播 session_updated（復用）失敗: {e}")
+    else:
+        try:
+            await manager.broadcast(
+                {
+                    "type": "session_created",
+                    "session": {
+                        "session_id": session.session_id,
+                        "project_directory": session.project_directory,
+                        "summary": session.summary,
+                        "title": session.title,
+                        "status": session.status.value,
+                        "status_message": session.status_message,
+                        "created_at": int(session.created_at * 1000),
+                        "last_activity": int(session.last_activity * 1000),
+                        "feedback_completed": False,
+                        "is_current": True,
+                        "user_messages": [],
+                    },
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            debug_log(f"廣播 session_created 失敗（不影響會話等待）: {e}")
 
     # Daemon 模式：外層由 mcp_feedback_enhanced.daemon 管理 uvicorn，
     # 此處僅創建會話並依賴前面已發出的 ``session_created`` 廣播通知前端，

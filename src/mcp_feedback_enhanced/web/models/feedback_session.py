@@ -177,6 +177,9 @@ class WebFeedbackSession:
         self.user_timeout_seconds = 3600  # 預設 1 小時
         self.user_timeout_timer: threading.Timer | None = None
 
+        # 可選：由 launch_web_feedback_ui 設置，用於 session 復用（同一對話多輪調用）
+        self.feedback_session_id: str | None = None
+
         # 確保臨時目錄存在
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -358,6 +361,24 @@ class WebFeedbackSession:
             SessionStatus.ACTIVE,
             SessionStatus.FEEDBACK_SUBMITTED,
         ]
+
+    def reset_for_reuse(self, new_summary: str, new_title: str | None = None) -> None:
+        """重置此 session 供同一對話的下一輪 MCP 調用復用。
+
+        前提：session 目前處於終態（FEEDBACK_SUBMITTED / COMPLETED / TIMEOUT）。
+        呼叫後 ``wait_for_feedback`` 可再次阻塞等待新一輪用戶回饋。
+        """
+        self.summary = new_summary
+        if new_title is not None:
+            self.title = new_title
+        self.status = SessionStatus.WAITING
+        self.status_message = "等待用戶回饋"
+        self.feedback_completed.clear()
+        self.feedback_result = None
+        self.images = []
+        self.settings = {}
+        self.last_activity = time.time()
+        debug_log(f"會話 {self.session_id} 已重置供復用（新摘要長度={len(new_summary)}）")
 
     def _liveness_time(self) -> float:
         """取「會話最後一次還活著」的時間戳（秒）。
@@ -580,6 +601,7 @@ class WebFeedbackSession:
                     "interactive_feedback": self.feedback_result or "",
                     "images": self.images,
                     "settings": self.settings,
+                    "feedback_session_id": self.feedback_session_id or self.session_id,
                 }
             # 超時了，立即清理資源
             debug_log(

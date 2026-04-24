@@ -202,33 +202,17 @@ for every shortcut, the per-session draft behavior, and archiving semantics.
 
 ### 4. Install the Agent Skill (recommended)
 
-This repo ships with an **Agent Skill** ([`docs/skill/SKILL.md`](docs/skill/SKILL.md))
+This repo ships with an **Agent Skill** at [`skills/interactive-feedback-loop/`](skills/interactive-feedback-loop/)
 that teaches any compatible AI agent to automatically call `interactive_feedback`
-after every task and loop on your feedback.
+after every task and loop on your feedback. It covers:
 
-**For Cursor** — copy it into the user-level skill directory:
+- Calling `interactive_feedback` after every task (with Markdown summary)
+- Extracting and reusing `feedback_session_id` across turns (session reuse)
+- Retrying on MCP timeout errors instead of giving up
+- Preventing subagent calls (avoids hangs)
 
-```bash
-mkdir -p ~/.cursor/skills/interactive-feedback-loop
-cp docs/skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
-```
-
-**For other AI agents** — paste the contents of `docs/skill/SKILL.md` into your
-agent's system prompt or custom-instructions file.
-
-The skill teaches the agent to:
-- Call `interactive_feedback` after every task (with Markdown summary)
-- Extract and reuse `feedback_session_id` across turns (session reuse)
-- Retry on MCP timeout errors instead of giving up
-- Never call the tool from a subagent (prevents hangs)
-
-> **Minimal alternative** — if you don't want the full skill, add this one-liner
-> to your AI assistant's prompt:
->
-> ```
-> # MCP Interactive Feedback Rules
-> follow mcp-feedback-enhanced instructions
-> ```
+Install the `skills/interactive-feedback-loop/` folder into your AI agent's
+skills directory to enable it.
 
 ## ⚙️ Advanced Settings
 

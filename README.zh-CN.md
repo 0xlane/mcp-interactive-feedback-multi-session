@@ -223,32 +223,16 @@ UI 按 **3 层信息架构**组织，避免全局动作和会话级工作混在�
 
 ### 4. 安装 Agent Skill（推荐）
 
-本仓库自带一份 **Agent Skill**（[`docs/skill/SKILL.md`](docs/skill/SKILL.md)），
+本仓库自带一份 **Agent Skill**，位于 [`skills/interactive-feedback-loop/`](skills/interactive-feedback-loop/)，
 可以教任何兼容的 AI Agent 在每次任务完成后自动调用 `interactive_feedback`
-并基于你的反馈循环迭代。
+并基于你的反馈循环迭代。它涵盖：
 
-**Cursor 用户** —— 复制到用户级 Skill 目录：
-
-```bash
-mkdir -p ~/.cursor/skills/interactive-feedback-loop
-cp docs/skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
-```
-
-**其他 AI Agent** —— 将 `docs/skill/SKILL.md` 的内容粘贴到你的 Agent
-系统提示词或自定义指令文件中。
-
-该 Skill 会教 Agent：
 - 每次任务完成后调用 `interactive_feedback`（带 Markdown 摘要）
 - 提取并复用 `feedback_session_id`（同一对话复用 session）
 - MCP 超时错误时自动重试，而非放弃
 - 禁止 subagent 调用该工具（避免卡死）
 
-> **最简替代** —— 如果不想安装完整 Skill，在 AI 助手提示词中加一句即可：
->
-> ```
-> # MCP Interactive Feedback 规则
-> 注意在任务完成前根据mcp-feedback-enhanced工具的要求进行工具调用
-> ```
+将 `skills/interactive-feedback-loop/` 目录安装到你的 AI Agent 的 skills 目录即可启用。
 
 ## ⚙️ 高级设置
 

@@ -50,7 +50,7 @@ v3.0 以三句話講完：
 - **後端**: Python 3.11+, FastMCP（Streamable HTTP）, FastAPI, uvicorn
 - **前端**: ES modules, 原生 WebSocket, Canvas, Notification API
 - **工具**: `uv` / `uvx`, `pytest` + `pytest-asyncio`, `ruff`, `mypy`
-- **發布**: 本倉庫為自用分支，不發布到 PyPI；Tauri 桌面構建亦已暫停。
+- **發布**: 本倉庫為自用分支，**不**發佈到 PyPI、不再構建 Tauri 桌面；`publish.yml` workflow 只做「版本升級 + tag + GitHub Release」（詳見 [WORKFLOWS.md](../WORKFLOWS.md)）。
 
 ---
 

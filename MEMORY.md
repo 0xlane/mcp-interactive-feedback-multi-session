@@ -41,7 +41,7 @@
 | MCP 工具 / REST / WebSocket 协议 | [`docs/architecture/api-reference.md`](./docs/architecture/api-reference.md) |
 | 部署 / SSH 远程 / launchctl | [`docs/architecture/deployment-guide.md`](./docs/architecture/deployment-guide.md) + [`docs/zh-CN/ssh-remote/`](./docs/zh-CN/ssh-remote/) |
 | 交互时序 / 序列图 | [`docs/architecture/interaction-flows.md`](./docs/architecture/interaction-flows.md) |
-| 本 fork 的历史 | `git log`（不维护 CHANGELOG；上游 v2.x 历史另请参照上游仓库） |
+| 本 fork 的 CHANGELOG | [`RELEASE_NOTES/CHANGELOG.zh-CN.md`](./RELEASE_NOTES/CHANGELOG.zh-CN.md)（只含 v3.0.0 起的 fork 历史；上游 v2.x 不在范围） |
 
 ## 关键实现文件
 

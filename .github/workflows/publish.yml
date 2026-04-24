@@ -1,0 +1,264 @@
+name: Auto Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type (ignored if custom_version is provided)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+        - patch    # 3.0.0 -> 3.0.1 (bug fixes, security patches, documentation updates)
+        - minor    # 3.0.0 -> 3.1.0 (new features, enhancements, backward-compatible changes)
+        - major    # 3.0.0 -> 4.0.0 (breaking changes, architecture refactoring, API changes)
+      custom_version:
+        description: 'Custom version number (e.g., 3.1.0) - overrides version_type if provided'
+        required: false
+        type: string
+
+# This workflow bumps the version, tags the commit, and creates a GitHub Release.
+# It does NOT publish to PyPI (this is a self-use fork) and does NOT build the
+# Tauri desktop shell (retired since v3.0).
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Commit dependency changes if any
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          git add .
+          git commit -m "chore: sync lockfile before release" || true
+        fi
+
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(grep '^version =' pyproject.toml | cut -d'"' -f2)
+        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+
+    - name: Determine new version
+      id: bump_version
+      run: |
+        CUSTOM_VERSION="${{ github.event.inputs.custom_version }}"
+
+        if [ -n "$CUSTOM_VERSION" ]; then
+          echo "🎯 Using custom version: $CUSTOM_VERSION"
+
+          if [[ ! "$CUSTOM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Custom version must be in format X.Y.Z (e.g., 3.1.0)"
+            exit 1
+          fi
+
+          sed -i "s/^version = \".*\"/version = \"$CUSTOM_VERSION\"/" pyproject.toml
+          sed -i "s/^current_version = .*/current_version = $CUSTOM_VERSION/" .bumpversion.cfg
+
+          NEW_VERSION="$CUSTOM_VERSION"
+          echo "✅ Set custom version: $NEW_VERSION"
+        else
+          echo "🔄 Using automatic version bump: ${{ github.event.inputs.version_type }}"
+          uv run bump2version --allow-dirty ${{ github.event.inputs.version_type }}
+          NEW_VERSION=$(grep '^version =' pyproject.toml | cut -d'"' -f2)
+          echo "✅ Bumped version to: $NEW_VERSION"
+        fi
+
+        echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+
+    - name: Update __init__.py version
+      run: |
+        NEW_VERSION="${{ steps.bump_version.outputs.new }}"
+        sed -i "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" src/mcp_feedback_enhanced/__init__.py
+
+    - name: Verify CHANGELOG files
+      run: |
+        NEW_VERSION="v${{ steps.bump_version.outputs.new }}"
+        echo "🔍 Verifying CHANGELOG files contain version ${NEW_VERSION}..."
+
+        MISSING_FILES=""
+        for lang in en zh-TW zh-CN; do
+          FILE="RELEASE_NOTES/CHANGELOG.${lang}.md"
+          if [ -f "$FILE" ]; then
+            if ! grep -q "\[${NEW_VERSION}\]" "$FILE"; then
+              echo "⚠️ Warning: ${NEW_VERSION} not found in ${FILE}"
+              MISSING_FILES="${MISSING_FILES} ${lang}"
+            else
+              echo "✅ Found ${NEW_VERSION} in ${FILE}"
+            fi
+          else
+            echo "❌ ${FILE} not found"
+            MISSING_FILES="${MISSING_FILES} ${lang}"
+          fi
+        done
+
+        if [ -n "$MISSING_FILES" ]; then
+          echo ""
+          echo "📝 Note: Please update CHANGELOG files with entry for ${NEW_VERSION}"
+          echo "Missing or incomplete files:${MISSING_FILES}"
+          echo "The release will continue, but the generated release notes will fall back to defaults."
+        else
+          echo "✅ All CHANGELOG files verified successfully"
+        fi
+
+    - name: Extract release highlights
+      id: extract_highlights
+      run: |
+        NEW_VERSION="v${{ steps.bump_version.outputs.new }}"
+
+        if [ -f "RELEASE_NOTES/CHANGELOG.en.md" ]; then
+          echo "🔍 Extracting highlights for $NEW_VERSION from CHANGELOG..."
+
+          sed -n "/## \[${NEW_VERSION}\]/,/## \[/p" RELEASE_NOTES/CHANGELOG.en.md | head -n -1 > version_section.txt
+
+          if grep -q "### 🌟 Highlights" version_section.txt; then
+            echo "📝 Found Highlights section"
+            sed -n '/### 🌟 Highlights/,/### /p' version_section.txt | head -n -1 | tail -n +2 | grep -E "^[^#]" | head -5 > highlights.txt
+          elif grep -q "### ✨ New Features" version_section.txt; then
+            echo "📝 Using New Features section as highlights"
+            sed -n '/### ✨ New Features/,/### /p' version_section.txt | head -n -1 | tail -n +2 | grep -E "^- " | head -4 > highlights.txt
+          else
+            echo "⚠️ No highlights or new features section found"
+            echo "" > highlights.txt
+          fi
+
+          rm -f version_section.txt
+
+          if [ -s highlights.txt ]; then
+            echo "✅ Successfully extracted highlights for $NEW_VERSION"
+            head -2 highlights.txt
+          else
+            echo "⚠️ No highlights extracted, using default content"
+            echo "- 🚀 Improvements and fixes" > highlights.txt
+          fi
+        else
+          echo "⚠️ CHANGELOG.en.md not found, using default highlights"
+          echo "- 🚀 Improvements and fixes" > highlights.txt
+        fi
+
+    - name: Generate release body
+      id: release_body
+      run: |
+        NEW_VERSION="v${{ steps.bump_version.outputs.new }}"
+        REPO="${{ github.repository }}"
+
+        RELEASE_TITLE=""
+        if [ -f "RELEASE_NOTES/CHANGELOG.en.md" ]; then
+          RELEASE_TITLE=$(grep "## \[${NEW_VERSION}\]" RELEASE_NOTES/CHANGELOG.en.md | head -1 | sed 's/## \[.*\] - //')
+        fi
+        if [ -z "$RELEASE_TITLE" ]; then
+          RELEASE_TITLE="Latest Release"
+        fi
+
+        {
+          echo "# Release ${NEW_VERSION} — ${RELEASE_TITLE}"
+          echo ""
+          echo "## 🌟 Key Highlights"
+          if [ -s highlights.txt ]; then
+            cat highlights.txt
+          else
+            echo "- 🚀 Improvements and fixes"
+          fi
+          echo ""
+          echo "## 🌐 Detailed Release Notes"
+          echo ""
+          echo "### 🇺🇸 English"
+          echo "📖 **[View English CHANGELOG](https://github.com/${REPO}/blob/main/RELEASE_NOTES/CHANGELOG.en.md)**"
+          echo ""
+          echo "### 🇹🇼 繁體中文"
+          echo "📖 **[查看繁體中文 CHANGELOG](https://github.com/${REPO}/blob/main/RELEASE_NOTES/CHANGELOG.zh-TW.md)**"
+          echo ""
+          echo "### 🇨🇳 简体中文"
+          echo "📖 **[查看简体中文 CHANGELOG](https://github.com/${REPO}/blob/main/RELEASE_NOTES/CHANGELOG.zh-CN.md)**"
+          echo ""
+          echo "---"
+          echo ""
+          echo "## 🔗 Links"
+          echo "- **Repository**: https://github.com/${REPO}"
+          echo "- **Documentation**: [README.md](https://github.com/${REPO}/blob/main/README.md)"
+          echo "- **Issues**: https://github.com/${REPO}/issues"
+          echo ""
+          echo "> This is a self-use fork and is **not** published to PyPI."
+          echo "> To try it, clone the repo and run \`uv sync && uv run mcp-interactive-feedback serve --http\`."
+          echo ""
+          echo "---"
+          echo "**Release automatically generated from CHANGELOG system** 🤖"
+        } > release_body.md
+
+        echo "Release body generated successfully"
+
+    - name: Commit version bump
+      run: |
+        CUSTOM_VERSION="${{ github.event.inputs.custom_version }}"
+        if [ -n "$CUSTOM_VERSION" ]; then
+          VERSION_METHOD="Custom version specified: $CUSTOM_VERSION"
+        else
+          VERSION_METHOD="Auto-bumped (${{ github.event.inputs.version_type }})"
+        fi
+
+        git add .
+        git commit -m "🔖 Release v${{ steps.bump_version.outputs.new }}
+
+        - Updated version to ${{ steps.bump_version.outputs.new }}
+        - $VERSION_METHOD
+        - Auto-generated release from workflow"
+        git tag "v${{ steps.bump_version.outputs.new }}"
+
+    - name: Push changes and tags
+      run: |
+        git push origin main
+        git push origin "v${{ steps.bump_version.outputs.new }}"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: "v${{ steps.bump_version.outputs.new }}"
+        name: "Release v${{ steps.bump_version.outputs.new }}"
+        body_path: release_body.md
+        draft: false
+        prerelease: false
+        generate_release_notes: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Summary
+      run: |
+        NEW_VERSION="v${{ steps.bump_version.outputs.new }}"
+        REPO="${{ github.repository }}"
+        echo "🎉 Release ${NEW_VERSION} completed successfully!"
+        echo ""
+        echo "🚀 GitHub Release: https://github.com/${REPO}/releases/tag/${NEW_VERSION}"
+        echo "📝 Release notes generated from CHANGELOG files"
+        echo ""
+        echo "ℹ️  This release is source-only (no PyPI publish, no desktop binaries)."
+        echo "ℹ️  To try it out:"
+        echo "     git clone https://github.com/${REPO} && cd $(basename ${REPO})"
+        echo "     uv sync"
+        echo "     uv run mcp-interactive-feedback serve --http"
+        echo ""
+        echo "📋 Reminder: make sure CHANGELOG files are updated for the next release."

@@ -329,10 +329,12 @@ make quick-check         # 快速修復
 
 ## 🆕 v3.0 與上游 v2.x 的差異
 
+📋 **本 fork 完整 CHANGELOG：** [RELEASE_NOTES/CHANGELOG.zh-TW.md](RELEASE_NOTES/CHANGELOG.zh-TW.md)
+
 > **範圍說明** —— 所有 **v2.6.x 以及之前**的版本都屬於上游
-> [Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)。
-> 本倉庫是自用分支，歷史從 **v3.0.0** 起算，範圍嚴格限定在下方的 HTTP
-> daemon / 多會話 / 3 層 UI 改造。本 fork 的詳細歷史請以 `git log` 為準。
+> [Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)，
+> **不**在本 fork 的 CHANGELOG 範圍內。本倉庫是自用分支，歷史從 **v3.0.0**
+> 起算，範圍嚴格限定在下方的 HTTP daemon / 多會話 / 3 層 UI 改造。
 
 ### v3.0.0 亮點
 

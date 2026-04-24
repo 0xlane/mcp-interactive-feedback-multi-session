@@ -304,11 +304,13 @@ make quick-check     # quick auto-fix pass
 
 ## 🆕 What v3.0 Changes vs. Upstream v2.x
 
+📋 **Full fork changelog:** [RELEASE_NOTES/CHANGELOG.en.md](RELEASE_NOTES/CHANGELOG.en.md)
+
 > **Scope note** — Everything **v2.6.x and earlier** belongs to the upstream
-> project ([Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)).
-> This fork is self-use only, starts at **v3.0.0**, and is limited to the HTTP
-> daemon / multi-session / 3-layer UI redesign. For detailed history of the
-> fork's changes, use `git log`.
+> project ([Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced))
+> and is **not** tracked in the fork's CHANGELOG. This fork is self-use only,
+> starts at **v3.0.0**, and is limited to the HTTP daemon / multi-session /
+> 3-layer UI redesign described below.
 
 - 🔌 **HTTP transport, single daemon**: stdio is gone; one long-running daemon on `127.0.0.1:8765` serves every AI agent on the machine.
 - 🗂️ **Real multi-session**: sessions are inserted (not replaced). All concurrent `interactive_feedback` calls coexist in one browser tab.

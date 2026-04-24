@@ -221,16 +221,21 @@ UI 按 **3 层信息架构**组织，避免全局动作和会话级工作混在�
 详细快捷键、每会话草稿行为、归档语义见
 [docs/architecture/phase3-multi-session-ui-usage.md](docs/architecture/phase3-multi-session-ui-usage.md)。
 
-### 4. 设置提示工程
+### 4. 安装 Agent Skill（推荐）
 
-为了获得最佳效果，安装本仓库自带的 **Cursor Skill**，使 Agent 在每次任务完成后
-自动调用 `interactive_feedback` 并基于你的反馈循环迭代：
+本仓库自带一份 **Agent Skill**（[`docs/skill/SKILL.md`](docs/skill/SKILL.md)），
+可以教任何兼容的 AI Agent 在每次任务完成后自动调用 `interactive_feedback`
+并基于你的反馈循环迭代。
+
+**Cursor 用户** —— 复制到用户级 Skill 目录：
 
 ```bash
-# 将 Skill 复制到 Cursor 用户级目录
 mkdir -p ~/.cursor/skills/interactive-feedback-loop
-cp docs/cursor-skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
+cp docs/skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
 ```
+
+**其他 AI Agent** —— 将 `docs/skill/SKILL.md` 的内容粘贴到你的 Agent
+系统提示词或自定义指令文件中。
 
 该 Skill 会教 Agent：
 - 每次任务完成后调用 `interactive_feedback`（带 Markdown 摘要）
@@ -238,15 +243,12 @@ cp docs/cursor-skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.m
 - MCP 超时错误时自动重试，而非放弃
 - 禁止 subagent 调用该工具（避免卡死）
 
-> **手动替代方案** —— 如果你不使用 Cursor Skills，可以在 AI 助手的系统提示词中
-> 添加以下规则：
+> **最简替代** —— 如果不想安装完整 Skill，在 AI 助手提示词中加一句即可：
 >
 > ```
 > # MCP Interactive Feedback 规则
 > 注意在任务完成前根据mcp-feedback-enhanced工具的要求进行工具调用
 > ```
-
-详见 [`docs/cursor-skill/SKILL.md`](docs/cursor-skill/SKILL.md)。
 
 ## ⚙️ 高级设置
 

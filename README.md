@@ -200,17 +200,21 @@ sidebar card, an `(N)` prefix on the browser title, and an OS-level notification
 See [docs/architecture/phase3-multi-session-ui-usage.md](docs/architecture/phase3-multi-session-ui-usage.md)
 for every shortcut, the per-session draft behavior, and archiving semantics.
 
-### 4. Prompt Engineering Setup
+### 4. Install the Agent Skill (recommended)
 
-For optimal results, install the **Cursor Skill** shipped with this repo so the
-agent automatically calls `interactive_feedback` after every task and loops on
-your feedback:
+This repo ships with an **Agent Skill** ([`docs/skill/SKILL.md`](docs/skill/SKILL.md))
+that teaches any compatible AI agent to automatically call `interactive_feedback`
+after every task and loop on your feedback.
+
+**For Cursor** — copy it into the user-level skill directory:
 
 ```bash
-# Copy the skill into Cursor's user-level skill directory
 mkdir -p ~/.cursor/skills/interactive-feedback-loop
-cp docs/cursor-skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
+cp docs/skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
 ```
+
+**For other AI agents** — paste the contents of `docs/skill/SKILL.md` into your
+agent's system prompt or custom-instructions file.
 
 The skill teaches the agent to:
 - Call `interactive_feedback` after every task (with Markdown summary)
@@ -218,16 +222,13 @@ The skill teaches the agent to:
 - Retry on MCP timeout errors instead of giving up
 - Never call the tool from a subagent (prevents hangs)
 
-> **Manual alternative** — if you don't use Cursor Skills, add this rule to your
-> AI assistant's system prompt instead:
+> **Minimal alternative** — if you don't want the full skill, add this one-liner
+> to your AI assistant's prompt:
 >
 > ```
 > # MCP Interactive Feedback Rules
 > follow mcp-feedback-enhanced instructions
 > ```
-
-See [`docs/cursor-skill/SKILL.md`](docs/cursor-skill/SKILL.md) for the full
-skill source.
 
 ## ⚙️ Advanced Settings
 

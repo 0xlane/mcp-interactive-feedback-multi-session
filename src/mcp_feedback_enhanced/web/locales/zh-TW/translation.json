@@ -320,6 +320,7 @@
         "noSummary": "無摘要",
         "copySessionContent": "複製會話內容",
         "copyUserContent": "複製用戶內容",
+        "copyAllUserMessages": "複製所有用戶訊息",
         "exportSession": "匯出此會話"
     },
     "sessionHistory": {

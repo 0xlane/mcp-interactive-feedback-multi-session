@@ -314,6 +314,7 @@
         },
         "copySessionContent": "Copy Session Content",
         "copyUserContent": "Copy User Content",
+        "copyAllUserMessages": "Copy All User Messages",
         "exportSession": "Export This Session"
     },
     "sessionHistory": {

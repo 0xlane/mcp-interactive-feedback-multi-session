@@ -315,6 +315,7 @@
         },
         "copySessionContent": "复制会话内容",
         "copyUserContent": "复制用户内容",
+        "copyAllUserMessages": "复制所有用户消息",
         "exportSession": "导出此会话"
     },
     "sessionHistory": {

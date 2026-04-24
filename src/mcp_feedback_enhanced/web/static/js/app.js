@@ -269,6 +269,9 @@
                         self.uiManager.initTabs();
                         self.imageHandler.init();
 
+                        // 15.5. 立即渲染模板注入的原始 markdown（不等 WebSocket）
+                        self.renderInitialMarkdown();
+
                         // 16. 檢查並啟動自動提交（如果條件滿足）
                         setTimeout(function() {
                             self.checkAndStartAutoSubmit();
@@ -702,6 +705,24 @@
             if (el) el.textContent = waitingText;
         });
         if (ta) ta.placeholder = window.i18nManager.t('app.noSessionPlaceholder');
+    };
+
+    /**
+     * 對模板注入的原始 summary 做一次 markdown 渲染，避免頁面重新整理後
+     * 看到未渲染的純文字（WebSocket snapshot 到來後會再次渲染，不衝突）。
+     */
+    FeedbackApp.prototype.renderInitialMarkdown = function () {
+        if (!this.uiManager || typeof this.uiManager.renderMarkdownSafely !== 'function') return;
+
+        var ids = ['#combinedSummaryContent', '#summaryContent'];
+        var self = this;
+        ids.forEach(function (sel) {
+            var el = document.querySelector(sel);
+            if (!el) return;
+            var raw = el.textContent || '';
+            if (!raw.trim()) return;
+            el.innerHTML = self.uiManager.renderMarkdownSafely(raw);
+        });
     };
 
     /**

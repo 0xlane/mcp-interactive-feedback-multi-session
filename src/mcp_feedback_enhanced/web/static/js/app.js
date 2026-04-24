@@ -1552,13 +1552,10 @@
 
             if (success) {
                 if (this.uiManager) {
-                    this.uiManager.resetFeedbackForm(true);
+                    this.uiManager.resetFeedbackForm(false);
                 }
                 if (this.imageHandler) {
                     this.imageHandler.clearImages();
-                }
-                if (submitSid && this._drafts) {
-                    delete this._drafts[submitSid];
                 }
                 console.log('📤 回饋已發送，等待服務器確認...');
             } else {

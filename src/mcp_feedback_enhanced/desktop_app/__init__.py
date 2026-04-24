@@ -12,10 +12,10 @@ MCP Interactive Feedback (HTTP fork) Desktop Application
 - 無需瀏覽器的獨立運行環境
 
 作者: 0xlane (MCP Feedback Enhanced HTTP fork)
-版本: 3.0.0
+版本: 3.0.1
 """
 
-__version__ = "3.0.0"
+__version__ = "3.0.1"
 __author__ = "0xlane"
 
 from .desktop_app import DesktopApp, launch_desktop_app

@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "Minidoracat", email = "minidora0702@gmail.com" },
-    { name = "Littlecowherd" },
     { name = "0xlane" }
 ]
 keywords = ["mcp", "ai", "feedback", "web-ui", "interactive", "development"]

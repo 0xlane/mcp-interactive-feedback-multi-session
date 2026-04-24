@@ -292,9 +292,9 @@ make check           # full lint + format + type check
 make quick-check     # quick auto-fix pass
 ```
 
-> Tauri desktop build targets (`make build-desktop*` / `test-desktop*`) were
-> retired in v3.0 — the desktop app is paused; see the project history. The
-> Rust/Tauri sources are kept in `src-tauri/` for reference only.
+> Tauri desktop build targets have been removed — the desktop app is paused
+> and this self-use fork does not build it. The Rust/Tauri sources are kept
+> in `src-tauri/` for reference only.
 
 **Testing Descriptions**
 - **Functional Testing**: Test complete MCP tool functionality workflow
@@ -302,18 +302,14 @@ make quick-check     # quick auto-fix pass
 - **Coverage Testing**: Generate HTML coverage report to `htmlcov/` directory
 - **Quality Checks**: Include linting, formatting, type checking
 
-## 🆕 Version History
-
-📋 **Complete Version History:** [RELEASE_NOTES/CHANGELOG.en.md](RELEASE_NOTES/CHANGELOG.en.md)
+## 🆕 What v3.0 Changes vs. Upstream v2.x
 
 > **Scope note** — Everything **v2.6.x and earlier** belongs to the upstream
-> project ([Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced));
-> those changelog entries are preserved under `RELEASE_NOTES/` only so the
-> provenance chain stays visible. I am **not** the author of those releases.
-> This fork's own history starts at **v3.0.0**, and is limited to the HTTP
-> daemon / multi-session / 3-layer UI redesign described below.
+> project ([Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)).
+> This fork is self-use only, starts at **v3.0.0**, and is limited to the HTTP
+> daemon / multi-session / 3-layer UI redesign. For detailed history of the
+> fork's changes, use `git log`.
 
-### Latest Version Highlights (v3.0.0)
 - 🔌 **HTTP transport, single daemon**: stdio is gone; one long-running daemon on `127.0.0.1:8765` serves every AI agent on the machine.
 - 🗂️ **Real multi-session**: sessions are inserted (not replaced). All concurrent `interactive_feedback` calls coexist in one browser tab.
 - 👁️ **Sticky active pointer**: a new session will not steal your current view — notification only via sidebar red dot + `(N)` title prefix + OS notification.

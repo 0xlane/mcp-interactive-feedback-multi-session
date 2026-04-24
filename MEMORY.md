@@ -13,20 +13,21 @@
 ### v3.0 里程碑
 
 - ✅ **Phase 1**（后端多会话化）：`WebUIManager.create_session` 改为插入式，不再销毁旧会话；每次 MCP 调用注册一个 `WebFeedbackSession`
-- ✅ **Phase 2**（HTTP Daemon）：`uvx mcp-feedback-enhanced serve --http` 单实例常驻；FastMCP Streamable HTTP 挂在 `/mcp/`；PID 锁 + 固定端口 `127.0.0.1:8765`
+- ✅ **Phase 2**（HTTP Daemon）：`uv run mcp-interactive-feedback serve --http` 单实例常驻；FastMCP Streamable HTTP 挂在 `/mcp/`；PID 锁 + 固定端口 `127.0.0.1:8765`
 - ✅ **Phase 3 (UI)**：单浏览器页面 + WebSocket 多路复用 + 双栏 SPA；粘滞活跃指针；每会话独立草稿；`Cmd/Ctrl+1..9` 快捷键；红点/`(N)` 标题/Favicon/桌面通知 四层 pending
 - ✅ **3 层信息架构**（最后一轮 UI 整理）：顶栏放应用级动作（⚙️ 设定 / ℹ️ 关于）、左栏底部放 🗂️ 会话历史、右栏 Tab 仅保留会话级内容（工作区（AI 摘要嵌入其中）/ 命令）
 
 ### 关键决策回顾
 
 - **破坏性变更**：v3.0 完全移除 stdio 模式，用户必须改 `mcp.json` 指向 HTTP URL
-- 启动方式：用户手动（`uvx`/`pip`），不提供 LaunchAgent/systemd
+- **本仓库是自用分支**：不发布到 PyPI，没有 CI；部署只有源码路径（`git clone` + `uv sync` + `uv run`）
+- 启动方式：用户手动（`uv run`），不提供 LaunchAgent/systemd
 - 绑定：`127.0.0.1:8765` 默认；端口占用直接报错
 - 认证：本地单用户，不启用 Token
 - 会话标识：MCP tool 新增 `title` 可选参数；缺省使用 project 目录 basename
 - **粘滞活跃**：新会话到达**不**抢前端视图，只打侧栏红点 + `(N)` 标题 + 系统通知
 - **归档语义**：`X` 按钮 = 后端字典物理删除（不是 UI 隐藏）
-- Tauri 桌面模式：v3.0 暂停维护（源码保留，构建流水线停用）
+- Tauri 桌面模式：v3.0 起停止构建（源码保留在 `src-tauri/` 仅作参考）
 
 ## 快速索引
 
@@ -40,7 +41,7 @@
 | MCP 工具 / REST / WebSocket 协议 | [`docs/architecture/api-reference.md`](./docs/architecture/api-reference.md) |
 | 部署 / SSH 远程 / launchctl | [`docs/architecture/deployment-guide.md`](./docs/architecture/deployment-guide.md) + [`docs/zh-CN/ssh-remote/`](./docs/zh-CN/ssh-remote/) |
 | 交互时序 / 序列图 | [`docs/architecture/interaction-flows.md`](./docs/architecture/interaction-flows.md) |
-| 历史版本记录 | [`RELEASE_NOTES/CHANGELOG.zh-CN.md`](./RELEASE_NOTES/CHANGELOG.zh-CN.md) |
+| 本 fork 的历史 | `git log`（不维护 CHANGELOG；上游 v2.x 历史另请参照上游仓库） |
 
 ## 关键实现文件
 

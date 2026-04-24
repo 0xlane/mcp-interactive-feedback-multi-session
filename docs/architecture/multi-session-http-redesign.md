@@ -374,10 +374,10 @@ Prompt 里建议引导 AI 用短语做标题（如 `"修复登录重定向"`、`
 **保持与当前一致**——用户手动执行一条命令即可，不提供 LaunchAgent / systemd / Task Scheduler 等服务化方案（个人本地使用场景，保持简单）：
 
 ```bash
-# 首次使用前手动启动一次，进程常驻
-uvx mcp-interactive-feedback serve --http
+# 首次使用前手动启动一次，进程常驻（从 clone 的仓库目录执行）
+uv run mcp-interactive-feedback serve --http
 
-# 或通过 pip 安装后
+# 激活 .venv 后的等价写法
 mcp-interactive-feedback serve --http
 ```
 

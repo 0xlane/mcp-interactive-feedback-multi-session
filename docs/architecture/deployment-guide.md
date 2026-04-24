@@ -4,24 +4,26 @@
 > 所有 AI Agent（Cursor / Claude / Cline / 自制脚本）通过同一个
 > `http://host:port/mcp/` 地址与它通信，不再每个 Agent 进程自带一个
 > stdio 版本。
+>
+> **本仓库为自用分支，不发布到 PyPI**：安装方式只有「从源码运行」一种，
+> 所有命令都基于 `git clone` + `uv sync` + `uv run`。
 
 目录：
 
 1. [前置条件](#1-前置条件)
-2. [本地部署](#2-本地部署)
+2. [本地部署（源码运行）](#2-本地部署源码运行)
 3. [SSH 远程 / 端口转发](#3-ssh-远程--端口转发)
 4. [配置 AI Agent](#4-配置-ai-agent)
 5. [进程管理 (launchctl / systemd / tmux)](#5-进程管理-launchctl--systemd--tmux)
 6. [升级 / 回滚](#6-升级--回滚)
-7. [可选：从源码运行](#7-可选从源码运行)
-8. [卸载 / 清理](#8-卸载--清理)
+7. [卸载 / 清理](#7-卸载--清理)
 
 ---
 
 ## 1. 前置条件
 
 - Python **3.11+**。
-- `uv` / `uvx` ≥ 0.4（推荐最新）。安装：
+- `uv` ≥ 0.4（推荐最新）。安装：
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
@@ -38,18 +40,21 @@
 
 ---
 
-## 2. 本地部署
+## 2. 本地部署（源码运行）
 
-最小可用命令：
+本仓库不发布 PyPI，所以部署 = clone + uv sync + uv run：
 
 ```bash
-uvx mcp-feedback-enhanced serve --http
+git clone https://github.com/0xlane/mcp-interactive-feedback-multi-session.git
+cd mcp-interactive-feedback-multi-session
+uv sync
+uv run mcp-interactive-feedback serve --http
 ```
 
-等价于：
+等价完整写法：
 
 ```bash
-uvx mcp-feedback-enhanced serve --http \
+uv run mcp-interactive-feedback serve --http \
   --host 127.0.0.1 \
   --port 8765 \
   --log-level info
@@ -66,6 +71,11 @@ INFO: Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
 ```
 http://127.0.0.1:8765
 ```
+
+> 不想每条命令都带 `uv run`？`uv sync` 已生成 `.venv/`，执行一次
+> `source .venv/bin/activate` 即可直接用 `mcp-interactive-feedback`。
+> 如要一个全局命令，也可以 `uv tool install --from . mcp-interactive-feedback`
+> 把当前源码装成工具。
 
 ### 2.1 常用参数速查
 
@@ -100,10 +110,11 @@ http://127.0.0.1:8765
 详见 [`../en/ssh-remote/browser-launch-issues.md`](../en/ssh-remote/browser-launch-issues.md)
 （含中英繁三语版本）。核心步骤：
 
-1. 在**远程主机**启动 daemon（推荐显式 `--port`）：
+1. 在**远程主机**启动 daemon（仓库需先 clone 到远程）：
 
    ```bash
-   uvx mcp-feedback-enhanced serve --http --port 8765
+   cd /path/to/mcp-interactive-feedback-multi-session
+   uv run mcp-interactive-feedback serve --http --port 8765
    ```
 
 2. 在**本地机器**建立 SSH 端口转发：
@@ -165,7 +176,7 @@ http://127.0.0.1:8765
 
 ## 5. 进程管理 (launchctl / systemd / tmux)
 
-v3.0 不内建「后台守护进程」模式：`uvx ... serve --http` 是前台阻塞
+v3.0 不内建「后台守护进程」模式：`uv run ... serve --http` 是前台阻塞
 的。推荐用系统自带工具把它拉起来。
 
 ### 5.1 macOS · launchctl
@@ -181,8 +192,11 @@ v3.0 不内建「后台守护进程」模式：`uvx ... serve --http` 是前台�
   <key>Label</key><string>com.user.mcp-feedback-enhanced</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/you/.local/bin/uvx</string>
-    <string>mcp-feedback-enhanced</string>
+    <string>/Users/you/.local/bin/uv</string>
+    <string>run</string>
+    <string>--directory</string>
+    <string>/Users/you/path/to/mcp-interactive-feedback-multi-session</string>
+    <string>mcp-interactive-feedback</string>
     <string>serve</string>
     <string>--http</string>
     <string>--host</string><string>127.0.0.1</string>
@@ -215,7 +229,8 @@ Description=MCP Feedback Enhanced (HTTP daemon)
 After=network-online.target
 
 [Service]
-ExecStart=%h/.local/bin/uvx mcp-feedback-enhanced serve --http --port 8765
+WorkingDirectory=%h/path/to/mcp-interactive-feedback-multi-session
+ExecStart=%h/.local/bin/uv run mcp-interactive-feedback serve --http --port 8765
 Restart=on-failure
 RestartSec=3
 
@@ -238,7 +253,8 @@ journalctl --user -u mcp-feedback-enhanced -f
 ```bash
 ssh user@remote
 tmux new -s mcp-fb
-uvx mcp-feedback-enhanced serve --http --port 8765
+cd /path/to/mcp-interactive-feedback-multi-session
+uv run mcp-interactive-feedback serve --http --port 8765
 # Ctrl+B D detach，下次 tmux attach -t mcp-fb
 ```
 
@@ -255,62 +271,52 @@ systemd user unit；或自行包装 Task Scheduler。
 
 ```bash
 # 1. 停 daemon（Ctrl+C 或 launchctl unload / systemctl --user stop）
-# 2. 更新 uv 缓存 + 拉最新版
-uv cache clean
-uvx mcp-feedback-enhanced@latest serve --http
+# 2. 更新源码 + 依赖
+cd /path/to/mcp-interactive-feedback-multi-session
+git pull
+uv sync
+# 3. 重新启动
+uv run mcp-interactive-feedback serve --http
 ```
 
-- 发布位于 PyPI（详情见 [`../WORKFLOWS.md`](../WORKFLOWS.md)）。
-- 启动后可通过 `mcp-feedback-enhanced version` 或页脚查看版本号。
+- 启动后可通过 `uv run mcp-interactive-feedback version` 或页脚查看版本号。
+- 版本号管理：`make bump-patch` / `bump-minor` / `bump-major`（仅更新本地
+  版本字符串，不会触发发布）。
 
 ### 6.2 固定版本
 
 ```bash
-uvx mcp-feedback-enhanced@3.0.0 serve --http
+cd /path/to/mcp-interactive-feedback-multi-session
+git checkout <tag-or-commit>
+uv sync
+uv run mcp-interactive-feedback serve --http
 ```
-
-在 CI / 生产环境建议 **pin 具体 minor 版本**，避免次次重启都解析最新
-依赖。
 
 ### 6.3 回滚
 
 ```bash
-uv cache clean
-uvx mcp-feedback-enhanced@2.x.y serve  # 或 stdio 模式
-```
-
-> ⚠️ v2.x 的 `mcp.json` 是 stdio 形态；回滚时别忘了一并恢复 Agent 侧
-> 配置。
-
----
-
-## 7. 可选：从源码运行
-
-适合本仓库开发者：
-
-```bash
-git clone https://github.com/<你 fork 的路径>/mcp-interactive-feedback-multi-session.git
-cd mcp-interactive-feedback-multi-session
+cd /path/to/mcp-interactive-feedback-multi-session
+git checkout <previous-tag>
 uv sync
-uv run python -m mcp_feedback_enhanced serve --http --port 8765
+uv run mcp-interactive-feedback serve --http
 ```
 
-- 改完 JS / CSS 请同步升 `feedback.html` 里的 `?v=YYYYMMDDNN` 时间戳，
-  确保浏览器加载到新资源（Phase 3 已形成惯例）。
-- 测试：`uv run pytest -x`。
-- 模拟 AI 调用：`uv run python scripts/dev_sim_feedback.py --timeout 1800`。
+> ⚠️ 如要回滚到上游 v2.x 的 stdio 形态，直接使用上游仓库
+> [Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)
+> 的对应版本；本 fork 不提供 stdio 兼容层，`mcp.json` 也要一并切回
+> `command/args` 形态。
 
 ---
 
-## 8. 卸载 / 清理
+## 7. 卸载 / 清理
 
 1. 停止 daemon（`Ctrl+C`、`launchctl unload` 或 `systemctl --user disable --now`）。
-2. 清理 uv 缓存（可选）：`uv cache clean`。
-3. 删除配置：`rm -rf ~/.config/mcp-feedback-enhanced`。
-4. 若通过 `uv tool install mcp-feedback-enhanced` 安装，另行
-   `uv tool uninstall mcp-feedback-enhanced`。
-5. 撤销 Agent 侧的 `mcp.json` 条目。
+2. 删除源码目录：`rm -rf /path/to/mcp-interactive-feedback-multi-session`。
+3. 清理 uv 缓存（可选）：`uv cache clean`。
+4. 删除配置：`rm -rf ~/.config/mcp-feedback-enhanced`。
+5. 若通过 `uv tool install` 装过全局命令：`uv tool uninstall mcp-interactive-feedback`。
+6. 撤销 Agent 侧的 `mcp.json` 条目。
 
 ---
 
-**文档版本**：v3.0.0-dev · **最后更新**：2026-04-22
+**文档版本**：v3.0.1 · **最后更新**：2026-04-24

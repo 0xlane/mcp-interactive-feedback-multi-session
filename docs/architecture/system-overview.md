@@ -25,8 +25,8 @@ v3.0 的目标非常聚焦：
    FastAPI 上，与 Web UI 共享一个端口；stdio 模式已移除。
 5. **面向本地 / 端口转发**：默认绑定 `127.0.0.1`，无需鉴权；
    SSH 远程场景通过端口转发访问，见 `ssh-remote/` 指南。
-6. **桌面模式暂停**：v3.0 聚焦 Web Only；Tauri 桌面相关代码仍在仓库
-   中，但 CI 构建已停用（见 [`../WORKFLOWS.md`](../WORKFLOWS.md)）。
+6. **桌面模式暂停**：v3.0 聚焦 Web Only；Tauri 桌面相关代码仍保留在
+   `src-tauri/` 作为参考，但本自用分支不再构建桌面 App。
 
 ---
 
@@ -64,7 +64,7 @@ v3.0 的目标非常聚焦：
 │  Host (本地 or SSH remote)                                     │
 │                                                               │
 │   ┌─────────────────────────────────────┐                     │
-│   │  uvx mcp-feedback-enhanced serve    │  ← daemon 进程       │
+│   │  uv run mcp-interactive-feedback    │  ← daemon 进程       │
 │   │  --http [--host 127.0.0.1:0]        │                     │
 │   │                                     │                     │
 │   │  ┌──────────────────────────────┐   │                     │
@@ -234,7 +234,6 @@ v3.0 里 `_active_session_id` 是「**前端当前正在看哪个会话**」的�
 | 开发想动后端模块 | `component-details.md` + `multi-session-http-redesign.md` |
 | 想对接 REST/WS 接口 | [`api-reference.md`](./api-reference.md) |
 | 想部署（本地、SSH 远程） | [`deployment-guide.md`](./deployment-guide.md) |
-| 想排查 CI / 发布 | [`../WORKFLOWS.md`](../WORKFLOWS.md) |
 
 ---
 

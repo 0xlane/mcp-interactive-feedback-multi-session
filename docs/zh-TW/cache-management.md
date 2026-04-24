@@ -1,14 +1,15 @@
 # UV Cache 管理指南
 
-> v3.0 說明：守護程序現在透過
-> `uvx mcp-feedback-enhanced serve --http` 常駐啟動。執行快取清理前
-> 請先停止 daemon（Ctrl+C 或
+> v3.0 說明：本自用分支從原始碼安裝（`uv sync`），守護程序透過
+> `uv run mcp-interactive-feedback serve --http` 從倉庫目錄啟動。執行
+> 快取清理前請先停止 daemon（Ctrl+C 或
 > `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`），或使用
 > `--force` 讓清理腳本嘗試先結束相關程序。
 
 ## 🔍 問題說明
 
-由於本專案使用 `uvx` 執行，每次運行都會在系統中建立 cache 檔案。隨著時間推移，這些 cache 可能會佔用大量磁碟空間。
+`uv sync` 以及偶爾使用的 `uvx` 工具都會往 `~/.cache/uv/` 寫資料；反覆
+`uv sync --upgrade` 或在多個 uv 專案間切換，都可能讓快取慢慢變大。
 
 ### Cache 位置
 - **Windows**: `%USERPROFILE%\AppData\Local\uv\cache`
@@ -72,14 +73,13 @@ python scripts/cleanup_cache.py --force
 
 ### 問題：清理後 cache 很快又變大
 
-**原因**：頻繁使用 `uvx mcp-feedback-enhanced@latest serve --http`
-（或 AI Agent 透過 MCP 觸發的 inline 呼叫）。每次 `uvx` 啟動都可能重
-新解析依賴並擴大快取。
+**原因**：反覆 `uv sync --upgrade`，或同時使用很多其他 `uvx` 工具，
+每一次都可能觸發依賴重新解析、解壓，讓快取再次膨脹。
 
 **建議**：
 1. **定期清理**：建議每週或每月清理一次
 2. **監控大小**：定期檢查 cache 大小
-3. **考慮本地安裝**：如果是開發者，可考慮本地安裝而非每次使用 uvx
+3. **固定依賴**：保持 `uv.lock` 更新，減少重複解析
 
 ## 📊 Cache 大小監控
 

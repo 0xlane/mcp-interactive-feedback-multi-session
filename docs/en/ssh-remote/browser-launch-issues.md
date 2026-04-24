@@ -29,8 +29,8 @@ Pick one of two host bindings depending on how you want to forward:
 On the remote:
 
 ```bash
-# Foreground; Ctrl+C to stop
-uvx mcp-feedback-enhanced serve --http
+# Foreground; Ctrl+C to stop (run from the cloned repo directory)
+uv run mcp-interactive-feedback serve --http
 # or
 uv run python -m mcp_feedback_enhanced serve --http
 ```
@@ -43,7 +43,7 @@ On your **local** machine, set up port forwarding (see §2).
 ### Option B — bind all interfaces (only if you control the network)
 
 ```bash
-uvx mcp-feedback-enhanced serve --http --host 0.0.0.0 --port 8765
+uv run mcp-interactive-feedback serve --http --host 0.0.0.0 --port 8765
 ```
 
 This listens on every interface. **Only safe if** the remote host is
@@ -124,7 +124,7 @@ A: Stale lock. Delete the file and retry:
 
 ```bash
 rm ~/.config/mcp-feedback-enhanced/daemon.pid
-uvx mcp-feedback-enhanced serve --http
+uv run mcp-interactive-feedback serve --http
 ```
 
 **Q: My agent keeps connecting to port 8765 on the laptop but the
@@ -134,12 +134,12 @@ with `curl http://localhost:8765/api/all-sessions` from the laptop
 before launching the AI call.
 
 **Q: Can the daemon survive when I disconnect SSH?**
-A: Not with plain `uvx ... serve --http` because `Ctrl+C` / SIGHUP on
+A: Not with plain `uv run ... serve --http` because `Ctrl+C` / SIGHUP on
 disconnect kills the foreground process. Use `tmux` / `screen` / `nohup`
 if you want it to persist across sessions:
 
 ```bash
-tmux new -d -s mcp-feedback 'uvx mcp-feedback-enhanced serve --http'
+tmux new -d -s mcp-feedback 'uv run mcp-interactive-feedback serve --http'
 ```
 
 v3.0 deliberately does not ship LaunchAgent / systemd templates

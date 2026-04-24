@@ -25,8 +25,8 @@ v3.0 反转了这个模型：
 远端执行：
 
 ```bash
-# 前台运行，Ctrl+C 停止
-uvx mcp-feedback-enhanced serve --http
+# 前台运行，Ctrl+C 停止（在 clone 的仓库目录中执行）
+uv run mcp-interactive-feedback serve --http
 # 或
 uv run python -m mcp_feedback_enhanced serve --http
 ```
@@ -38,7 +38,7 @@ uv run python -m mcp_feedback_enhanced serve --http
 ### 方案 B —— 绑定所有网卡（仅在你控制网络时使用）
 
 ```bash
-uvx mcp-feedback-enhanced serve --http --host 0.0.0.0 --port 8765
+uv run mcp-interactive-feedback serve --http --host 0.0.0.0 --port 8765
 ```
 
 会在所有网卡监听。**仅当**远端在防火墙后且端口不对公网开放时安全。
@@ -116,7 +116,7 @@ A：Stale lock。删掉文件再重启：
 
 ```bash
 rm ~/.config/mcp-feedback-enhanced/daemon.pid
-uvx mcp-feedback-enhanced serve --http
+uv run mcp-interactive-feedback serve --http
 ```
 
 **Q：agent 一直连本地 8765，但 daemon 在服务器上——没反应。**
@@ -125,11 +125,11 @@ A：SSH 端口转发其实没生效。回到 §2 重新检查，先用
 发起 AI 调用。
 
 **Q：SSH 断开后 daemon 还能活着吗？**
-A：直接 `uvx ... serve --http` 前台进程，Ctrl+C / SIGHUP 会把它杀掉。
+A：直接 `uv run ... serve --http` 前台进程，Ctrl+C / SIGHUP 会把它杀掉。
 要长期存活用 `tmux` / `screen` / `nohup`：
 
 ```bash
-tmux new -d -s mcp-feedback 'uvx mcp-feedback-enhanced serve --http'
+tmux new -d -s mcp-feedback 'uv run mcp-interactive-feedback serve --http'
 ```
 
 v3.0 刻意不提供 LaunchAgent / systemd 模板（设计决议见

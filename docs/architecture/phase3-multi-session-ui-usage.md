@@ -27,7 +27,7 @@
 
 ```bash
 # 一次性启动 daemon（保持前台）
-uvx mcp-feedback-enhanced serve --http
+uv run mcp-interactive-feedback serve --http
 # 或从源码
 uv run python -m mcp_feedback_enhanced serve --http
 ```

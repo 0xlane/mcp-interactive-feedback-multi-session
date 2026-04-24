@@ -316,8 +316,8 @@ make check               # 完整 lint + format + type-check
 make quick-check         # 快速修復
 ```
 
-> Tauri 桌面建置目標（`build-desktop*` / `test-desktop*`）已隨桌面外殼一起
-> 於 v3.0 暫停。計畫恢復時，會以套殼 HTTP daemon 的方式重新上線。
+> 桌面建置目標已隨桌面外殼一起移除。本自用分支不再建置 Tauri 桌面 App，
+> 原始碼保留在 `src-tauri/` 僅作參考。
 
 **測試說明**
 
@@ -327,17 +327,14 @@ make quick-check         # 快速修復
 - **品質檢查**：包含 linting / formatting / type-check
 
 
-## 🆕 版本更新記錄
-
-📋 **完整版本更新記錄：** [RELEASE_NOTES/CHANGELOG.zh-TW.md](RELEASE_NOTES/CHANGELOG.zh-TW.md)
+## 🆕 v3.0 與上游 v2.x 的差異
 
 > **範圍說明** —— 所有 **v2.6.x 以及之前**的版本都屬於上游
-> [Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)，
-> 我把那些 changelog 保留在 `RELEASE_NOTES/` 目錄只是為了保留血統鏈；
-> 我**並不是**那些發行版的作者。本 fork 自己的歷史從 **v3.0.0** 起算，範圍
-> 嚴格限定在下方介紹的 HTTP daemon / 多會話 / 3 層 UI 改造。
+> [Minidoracat/mcp-feedback-enhanced](https://github.com/Minidoracat/mcp-feedback-enhanced)。
+> 本倉庫是自用分支，歷史從 **v3.0.0** 起算，範圍嚴格限定在下方的 HTTP
+> daemon / 多會話 / 3 層 UI 改造。本 fork 的詳細歷史請以 `git log` 為準。
 
-### 最新版本亮點（v3.0.0）
+### v3.0.0 亮點
 
 - 🌐 **HTTP daemon 模式**：徹底移除 stdio，同機所有 AI Agent 共用一個常駐
   daemon（`uv run mcp-interactive-feedback serve --http`），以 PID 鎖防止多實例。

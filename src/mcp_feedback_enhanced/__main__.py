@@ -380,25 +380,21 @@ def test_desktop_app():
                         return None
                 else:
                     print(f"⚠️  開發環境路徑不存在: {tauri_python_path}")
-                    print("💡 這可能是 PyPI 安裝的版本，桌面應用功能不可用")
+                    print("💡 桌面應用已在本自用分支停用")
                     return None
 
             launch_desktop_app_func = import_desktop_app()
             if launch_desktop_app_func is None:
                 print("❌ 桌面應用程式不可用")
-                print("💡 可能的原因：")
-                print("   1. 此版本不包含桌面應用程式二進制檔案")
-                print("   2. 請使用包含桌面應用的版本，或使用 Web 模式")
-                print("   3. Web 模式指令：uvx mcp-feedback-enhanced test --web")
+                print("💡 本自用分支不再構建 Tauri 桌面應用。")
+                print("   請改用 Web 模式：uv run mcp-interactive-feedback test --web")
                 return False
 
             print("✅ 桌面應用程式模組導入成功")
 
         except ImportError as e:
             print(f"❌ 無法導入桌面應用程式模組: {e}")
-            print(
-                "💡 請確保已執行 'make build-desktop' 或 'python scripts/build_desktop.py'"
-            )
+            print("💡 本自用分支不再構建 Tauri 桌面應用，請改用 Web 模式。")
             return False
 
         print("🚀 啟動桌面應用程式...")

@@ -9,10 +9,10 @@
 Daemon 必须由用户手动启动，进程常驻，服务同一用户下所有 AI Agent。
 
 ```bash
-# 前台启动（Ctrl+C 结束）
-uvx mcp-feedback-enhanced serve --http
+# 从仓库目录启动（前台；Ctrl+C 结束）
+uv run mcp-interactive-feedback serve --http
 
-# 或使用已 clone 的源码
+# 等价写法
 uv run python -m mcp_feedback_enhanced serve --http
 ```
 
@@ -64,8 +64,8 @@ uv run python -m mcp_feedback_enhanced serve --http
 `server`（stdio）子命令仍保留，但不再推荐使用：
 
 ```bash
-# ⚠️ 过渡保留，阶段 5 将移除
-uvx mcp-feedback-enhanced server
+# ⚠️ 过渡保留
+uv run mcp-interactive-feedback server
 ```
 
 ## 3. 端点一览
@@ -82,7 +82,7 @@ Daemon 启动后对外开放：
 
 ## 4. 首次上手流程
 
-1. 终端 A：`uvx mcp-feedback-enhanced serve --http` —— daemon 启动；
+1. 终端 A：`uv run mcp-interactive-feedback serve --http` —— daemon 启动；
 2. 浏览器打开 `http://127.0.0.1:8765/` —— Web UI；
 3. 修改 `~/.cursor/mcp.json` 如上；
 4. 在 Cursor 发起一次 `interactive_feedback` 调用 —— 会话出现在浏览器里；
@@ -108,7 +108,7 @@ curl -s http://127.0.0.1:8765/                        # 应返回 Web UI HTML
 ```
 
 **Q：想绑别的端口**
-A：`uvx mcp-feedback-enhanced serve --http --port 18765`，同步改 `mcp.json` 的 `url` 即可。不做自动递增是为了让 `mcp.json` 里的 URL 稳定可复制。
+A：`uv run mcp-interactive-feedback serve --http --port 18765`，同步改 `mcp.json` 的 `url` 即可。不做自动递增是为了让 `mcp.json` 里的 URL 稳定可复制。
 
 ## 6. 已知限制（阶段 2）
 

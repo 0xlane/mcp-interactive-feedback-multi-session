@@ -24,7 +24,7 @@
 
 v3.0 以三句話講完：
 
-1. **單機一個 daemon**：`uvx mcp-feedback-enhanced serve --http` 常駐，
+1. **單機一個 daemon**：`uv run mcp-interactive-feedback serve --http` 常駐，
    綁定 127.0.0.1:8765（可自定）。
 2. **多會話並存**：每次 MCP `interactive_feedback` 調用插入一個
    `WebFeedbackSession`，互不銷毀。
@@ -50,8 +50,7 @@ v3.0 以三句話講完：
 - **後端**: Python 3.11+, FastMCP（Streamable HTTP）, FastAPI, uvicorn
 - **前端**: ES modules, 原生 WebSocket, Canvas, Notification API
 - **工具**: `uv` / `uvx`, `pytest` + `pytest-asyncio`, `ruff`, `mypy`
-- **發布**: PyPI（見 [`../WORKFLOWS.md`](../WORKFLOWS.md)；Tauri 桌面
-  構建已暫停）
+- **發布**: 本倉庫為自用分支，不發布到 PyPI；Tauri 桌面構建亦已暫停。
 
 ---
 
@@ -64,7 +63,6 @@ v3.0 以三句話講完：
 - **我要改前端** → [組件詳細說明 §8](./component-details.md#8-前端模块地图)
 - **我要接 API** → [API 參考](./api-reference.md)
 - **SSH 遠端** → [`../en/ssh-remote/browser-launch-issues.md`](../en/ssh-remote/browser-launch-issues.md)（含 zh-CN / zh-TW）
-- **桌面模式 / CI 發布** → [`../WORKFLOWS.md`](../WORKFLOWS.md)
 
 ---
 

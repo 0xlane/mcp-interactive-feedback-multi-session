@@ -20,7 +20,7 @@
 
 ## 1. CLI 入口 (`__main__.py`)
 
-`python -m mcp_feedback_enhanced` 或 `uvx mcp-feedback-enhanced` 的
+`python -m mcp_feedback_enhanced` 或 `uv run mcp-interactive-feedback` 的
 argparse 入口。v3.0 后的子命令：
 
 | 子命令 | 用途 | 状态 |

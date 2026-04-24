@@ -1,13 +1,17 @@
 # UV Cache Management Guide
 
-> v3.0 note: the daemon is typically launched via
-> `uvx mcp-feedback-enhanced serve --http` and stays running in the
-> foreground. Stop the daemon (Ctrl+C) before running cache cleanup, or
-> use `--force` which attempts to terminate related processes first.
+> v3.0 note: this self-use fork is installed from source with `uv sync`,
+> and the daemon is launched via
+> `uv run mcp-interactive-feedback serve --http` from the cloned repo.
+> Stop the daemon (Ctrl+C) before running cache cleanup, or use `--force`
+> which attempts to terminate related processes first.
 
 ## 🔍 Problem Description
 
-Since this project uses `uvx` for execution, cache files are created in the system with each run. Over time, these caches can consume significant disk space.
+`uv sync` and any transient `uvx` usage both populate `~/.cache/uv/`.
+Over time, that cache can consume significant disk space — especially
+if you frequently rebuild the environment or switch between multiple
+uv tools.
 
 ### Cache Location
 - **Windows**: `%USERPROFILE%\AppData\Local\uv\cache`
@@ -72,14 +76,14 @@ python scripts/cleanup_cache.py --force
 
 ### Issue: Cache grows large again quickly after cleanup
 
-**Cause**: Frequent use of `uvx mcp-feedback-enhanced@latest serve --http`
-(or inline calls from MCP clients). Each `uvx` invocation may re-resolve
-dependencies and expand the cache.
+**Cause**: Repeated `uv sync --upgrade` runs, or running many unrelated
+`uvx` tools, each of which may re-resolve dependencies and expand the
+cache.
 
 **Recommendations**:
 1. **Regular cleanup**: Recommend weekly or monthly cleanup
 2. **Monitor size**: Regularly check cache size
-3. **Consider local installation**: For developers, consider local installation instead of uvx
+3. **Pin deps**: Keep `uv.lock` up to date to reduce re-resolution churn
 
 ## 📊 Cache Size Monitoring
 

@@ -17,7 +17,7 @@ sequenceDiagram
     participant F as FastAPI app
     participant W as WebUIManager
 
-    U->>M: uvx mcp-feedback-enhanced serve --http --port 8765
+    U->>M: uv run mcp-interactive-feedback serve --http --port 8765
     M->>D: run_serve_http(args)
     D->>L: acquire()
     alt 已有存活 daemon

@@ -223,7 +223,7 @@
     },
     "modals": {
         "sessions": {
-            "title": "📊 Session History"
+            "title": "🗂️ Session History"
         },
         "settings": {
             "title": "⚙️ Settings"

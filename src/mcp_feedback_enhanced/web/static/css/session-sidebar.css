@@ -192,12 +192,12 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 10px;
-  background: transparent;
-  border: 1px solid transparent;
+  padding: 8px 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   text-align: left;
@@ -220,7 +220,23 @@
 }
 
 .sidebar-footer-label {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+}
+
+.sidebar-footer-chevron {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-tertiary, var(--text-secondary));
+  opacity: 0.6;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-footer-btn:hover .sidebar-footer-chevron {
+  opacity: 1;
+  color: var(--text-primary);
+  transform: translateX(2px);
 }
 
 /* i18n 翻譯通過 textContent 注入，`<br>` 會被轉成字面字串；為了讓

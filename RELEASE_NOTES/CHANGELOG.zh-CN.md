@@ -9,6 +9,41 @@
 
 ---
 
+## [v3.1.0] - 2026-04-24 - 会话复用与 Agent Skill
+
+### 🌟 版本亮点
+同一对话内多次调用 `interactive_feedback` 现在会复用同一个浏览器会话，
+不再每轮都创建新卡片。仓库附带 Agent Skill，让任何兼容的 AI Agent
+都能自动循环收集用户反馈。
+
+### ✨ 新功能
+- 🔄 **`feedback_session_id` 会话复用**：工具返回的 `feedback_session_id`
+  传入下一次调用即可复用同一 UI 会话——不会产生新侧栏卡片，反馈文本被清空，
+  AI 摘要就地更新
+- 📝 **Agent Skill (`skills/interactive-feedback-loop/`)**：符合开放标准的
+  `SKILL.md`，教 Agent 在每次任务后调用工具、提取并复用
+  `feedback_session_id`、超时重试、禁止子代理调用
+
+### 🐛 问题修复
+- ✏️ **提交后保留反馈文本**：输入框在提交后不再立即清空，等到下一轮 AI
+  摘要到来时才清空
+- 📄 **页面刷新后 Markdown 正常渲染**：Jinja2 注入的原始 Markdown 在页面加载时
+  立即渲染，不再依赖 WebSocket 快照事件
+- 🔁 **会话复用条件修正**：`FEEDBACK_SUBMITTED` 状态的会话现在能被正确复用
+  （之前被 `is_active` 检查阻断）
+- 🧹 **复用时清空反馈文本**：当会话被复用（状态回到 `waiting`）时，草稿文本、
+  图片和旧摘要通过 Store 监听器同步替换，绕过了 debounce 时序问题
+- ⏎ **Ctrl+C 立即退出 daemon**：设置 `timeout_graceful_shutdown=0`，
+  不再出现"等待连接关闭"的挂起
+
+### 📚 文档
+- 📖 **README 新增 Agent Skill 章节**（en / zh-CN / zh-TW）：安装说明、
+  功能列表，以及指向 `SKILL.md` 的链接
+- 📋 **CHANGELOG 系统与发布工作流**：`RELEASE_NOTES/` 下三语 CHANGELOG 文件，
+  GitHub Actions 自动发布工作流，以及 `scripts/release.py` 辅助脚本
+
+---
+
 ## [v3.0.1] - 2026-04-24 - 工作区 i18n 与 UI 细节打磨
 
 ### 🌟 版本亮点

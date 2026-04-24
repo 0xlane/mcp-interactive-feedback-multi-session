@@ -15,7 +15,7 @@ MCP Interactive Feedback (HTTP fork) Desktop Application
 版本: 3.0.1
 """
 
-__version__ = "3.0.1"
+__version__ = "3.1.0"
 __author__ = "0xlane"
 
 from .desktop_app import DesktopApp, launch_desktop_app

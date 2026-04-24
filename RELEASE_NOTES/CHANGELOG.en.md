@@ -9,6 +9,46 @@ and is not tracked here.
 
 ---
 
+## [v3.1.0] - 2026-04-24 - Session Reuse & Agent Skill
+
+### 🌟 Highlights
+Same-conversation calls to `interactive_feedback` now reuse one browser
+session instead of spawning a new card every turn. An Agent Skill ships in
+the repo so any compatible agent automatically loops on user feedback.
+
+### ✨ New Features
+- 🔄 **`feedback_session_id` for session reuse**: the tool returns a
+  `feedback_session_id` in its response; passing it back on subsequent calls
+  reuses the same UI session — no new sidebar cards, feedback text is cleared
+  and the AI summary is updated in place
+- 📝 **Agent Skill (`skills/interactive-feedback-loop/`)**: open-standard
+  `SKILL.md` that teaches any agent to call the tool after every task, extract
+  and reuse `feedback_session_id`, retry on MCP timeout, and never call the
+  tool from a subagent
+
+### 🐛 Bug Fixes
+- ✏️ **Feedback text preserved after submit**: input box now keeps the user's
+  text after submission until the next AI summary arrives (instead of clearing
+  it immediately)
+- 📄 **Markdown renders on page refresh**: raw markdown injected by Jinja2 is
+  rendered immediately on load, no longer requires a WebSocket snapshot event
+- 🔁 **Session reuse condition fixed**: `FEEDBACK_SUBMITTED` sessions are now
+  correctly treated as reusable (previously blocked by the `is_active` check)
+- 🧹 **Feedback text clears on reuse**: when a session is reused
+  (status → `waiting`), draft text, images, and the old summary are replaced
+  synchronously via the Store listener, bypassing debounce timing issues
+- ⏎ **Ctrl+C exits daemon immediately**: `timeout_graceful_shutdown=0`
+  prevents the "Waiting for connections to close" hang on SIGINT
+
+### 📚 Documentation
+- 📖 **Agent Skill section in README** (en / zh-CN / zh-TW): installation
+  instructions, feature list, and link to the shipped `SKILL.md`
+- 📋 **CHANGELOG system & release workflow**: trilingual CHANGELOG files under
+  `RELEASE_NOTES/`, GitHub Actions workflow for automated releases, and a
+  `scripts/release.py` helper
+
+---
+
 ## [v3.0.1] - 2026-04-24 - Workspace i18n & UI Refinements
 
 ### 🌟 Highlights

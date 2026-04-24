@@ -294,7 +294,7 @@ class SessionStatus(Enum):
 | `modules/ui-manager.js` | 表单禁用/启用、按钮文案；识别 `FEEDBACK_NO_SESSION` 态；与 `app._setFeedbackFormDisabled` 协同 |
 | `modules/utils.js` | 常量/工具；新增 `FEEDBACK_NO_SESSION` |
 | `modules/app-shell-modal.js` | **v3.0 新增**。声明式应用模态开关器：`[data-modal-open]` / `[data-modal-dismiss]` 属性即可驱动模态开关；Esc/backdrop 关闭；同一时刻只开一个；`body.app-modal-open` 锁页面滚动。暴露 `open/close/closeAll/getCurrent` 4 个 API 供脚本使用 |
-| `modules/connection-monitor.js` | 连接状态监控（连接时长、重连次数、消息数、延迟）。v3.0 起直接读 `MCPFeedback.sessionStore` 计算会话数与当前状态，并启动 1 秒 display ticker，让统计面板不会因为没有事件到来而冻结 |
+| `modules/connection-monitor.js` | 连接状态监控（连接时长、重连次数、消息数、延迟）。v3.0 起直接读 `MCPFeedback.sessionStore` 计算会话数与当前状态，并启动 1 秒 display ticker，让指示器 tooltip 不会因为没有事件到来而冻结；v3.0.x 把原「浮动统计面板」去掉，改为把所有指标聚合到顶栏 `#connectionStatusMinimal` 的 tooltip 里 |
 | `modules/image-handler.js` · `modules/file-upload-manager.js` | 图片/文件上传、粘贴板兼容 |
 | `modules/tab-manager.js` · `modules/settings-manager.js` · `modules/audio` · `modules/prompt` · `modules/session` · `modules/session-manager.js` · `modules/logger.js` · `modules/constants` · `modules/utils` · `modules/textarea-height-manager.js` | 其他功能/兼容模块，沿用 v2.x 设计 |
 

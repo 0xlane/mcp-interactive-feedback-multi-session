@@ -15,7 +15,7 @@
 - ✅ **Phase 1**（后端多会话化）：`WebUIManager.create_session` 改为插入式，不再销毁旧会话；每次 MCP 调用注册一个 `WebFeedbackSession`
 - ✅ **Phase 2**（HTTP Daemon）：`uvx mcp-feedback-enhanced serve --http` 单实例常驻；FastMCP Streamable HTTP 挂在 `/mcp/`；PID 锁 + 固定端口 `127.0.0.1:8765`
 - ✅ **Phase 3 (UI)**：单浏览器页面 + WebSocket 多路复用 + 双栏 SPA；粘滞活跃指针；每会话独立草稿；`Cmd/Ctrl+1..9` 快捷键；红点/`(N)` 标题/Favicon/桌面通知 四层 pending
-- ✅ **3 层信息架构**（最后一轮 UI 整理）：顶栏放应用级动作（⚙️ 设定 / ℹ️ 关于）、左栏底部放 📊 会话历史、右栏 Tab 仅保留会话级内容（工作区 / AI 摘要 / 命令）
+- ✅ **3 层信息架构**（最后一轮 UI 整理）：顶栏放应用级动作（⚙️ 设定 / ℹ️ 关于）、左栏底部放 🗂️ 会话历史、右栏 Tab 仅保留会话级内容（工作区（AI 摘要嵌入其中）/ 命令）
 
 ### 关键决策回顾
 

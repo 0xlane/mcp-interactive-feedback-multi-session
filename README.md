@@ -48,8 +48,8 @@ browser tab that aggregates every concurrent AI session**:
 
 ### 🪟 3-layer UI
 - **Topbar**: app-wide `⚙️ Settings` / `ℹ️ About` → modals (never tangled with session tabs)
-- **Left sidebar**: live session list, pending red dots, `📊 Session History` modal at the bottom
-- **Right pane tabs**: strictly session-level work — `📝 Workspace` / `📋 AI Summary` / `⚡ Command`
+- **Left sidebar**: live session list, pending red dots, `🗂️ Session History` modal at the bottom
+- **Right pane tabs**: strictly session-level work — `📝 Workspace` (with embedded AI Summary) / `⚡ Command`
 - **Quick switch**: click a session card, or use `Cmd/Ctrl+1..9`
 - **Four-layer pending notification**: sidebar red dot · `(N)` title prefix · favicon badge · OS desktop notification
 
@@ -80,11 +80,11 @@ browser tab that aggregates every concurrent AI session**:
 
 *v3.0 Web UI with two parallel sessions coming from two AI agents. The **topbar**
 hosts app-wide actions (⚙️ Settings / ℹ️ About); the **left sidebar** lists
-live sessions (active one is highlighted) and has a `📊 Session History`
+live sessions (active one is highlighted) and has a `🗂️ Session History`
 button pinned at the bottom; the **right pane** exposes only **session-level**
 tabs (`📝 Workspace` / `⚡ Command`, with AI Summary embedded in Workspace).
-The connection monitor at the bottom is expanded, showing uptime, reconnects,
-message count, latency, session count and current session status.*
+Hover the top-right `● Connected` indicator to see uptime, reconnects,
+message count, latency and session count in a tooltip.*
 
 <details>
 <summary>📱 Click to view the Session History modal (cross-session, app-level)</summary>
@@ -93,7 +93,7 @@ message count, latency, session count and current session status.*
   <img src="docs/en/images/web2.png" width="800" alt="Web UI — Session History modal launched from the left sidebar" />
 </div>
 
-*Opening `📊 Session History` from the bottom of the sidebar dims the
+*Opening `🗂️ Session History` from the bottom of the sidebar dims the
 rest of the UI and shows an app-level modal with today's sessions, average
 duration, export/clear actions. Modals like this (Session History / Settings /
 About) live in the **app-wide** layer so they do not pollute per-session
@@ -189,8 +189,8 @@ actions never get mixed up with session-level work:
 | Layer | Where | What lives there |
 |---|---|---|
 | **App-wide** | Topbar (top-right) | `⚙️ Settings` / `ℹ️ About` icon buttons → modals |
-| **Cross-session** | Left sidebar | Live session list + `📊 Session History` button at the bottom → modal |
-| **Current session** | Right pane tabs | `📝 Workspace` / `📋 AI Summary` / `⚡ Command` |
+| **Cross-session** | Left sidebar | Live session list + `🗂️ Session History` button at the bottom → modal |
+| **Current session** | Right pane tabs | `📝 Workspace` (with embedded AI Summary) / `⚡ Command` |
 
 Every concurrent AI chat that calls `interactive_feedback` shows up as a new
 card in the left sidebar. Switch with a click or `Cmd/Ctrl+1..9`. New sessions

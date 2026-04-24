@@ -1428,9 +1428,21 @@ async def launch_web_feedback_ui(
     # ---- 廣播 ----
     if reused:
         try:
-            await manager.broadcast_session_event(
-                "session_updated", session.session_id,
-                summary=session.summary,
+            await manager.broadcast(
+                {
+                    "type": "session_updated",
+                    "session_info": {
+                        "session_id": session.session_id,
+                        "project_directory": session.project_directory,
+                        "summary": session.summary,
+                        "title": session.title,
+                        "status": session.status.value,
+                        "status_message": session.status_message,
+                        "created_at": int(session.created_at * 1000),
+                        "last_activity": int(session.last_activity * 1000),
+                    },
+                    "reused": True,
+                }
             )
         except Exception as e:  # noqa: BLE001
             debug_log(f"廣播 session_updated（復用）失敗: {e}")

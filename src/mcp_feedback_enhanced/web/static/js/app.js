@@ -1322,15 +1322,28 @@
                 }
             }
 
-            // 檢查當前狀態，只有在非已提交狀態時才重置
-            const currentState = this.uiManager.getFeedbackState();
-            if (currentState !== window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_SUBMITTED) {
+            // session 復用（reused=true 且 status=waiting）：清空表單，準備新一輪回饋
+            if (data.reused && data.session_info && data.session_info.status === 'waiting') {
+                console.log('🔁 session 被復用，清空回饋表單');
+                if (this._drafts) {
+                    delete this._drafts[newSessionId];
+                }
+                this.uiManager.resetFeedbackForm(true);
+                if (this.imageHandler) {
+                    this.imageHandler.clearImages();
+                }
                 this.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING, newSessionId);
-                console.log('🔄 會話更新：重置回饋狀態為等待新回饋');
+                if (data.session_info.summary) {
+                    this.uiManager.updateAISummaryContent(data.session_info.summary);
+                }
             } else {
-                console.log('🔒 會話更新：保護已提交狀態，不重置');
-                // 更新會話ID但保持已提交狀態
-                this.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_SUBMITTED, newSessionId);
+                // 普通更新：保護已提交狀態
+                var currentState = this.uiManager.getFeedbackState();
+                if (currentState !== window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_SUBMITTED) {
+                    this.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING, newSessionId);
+                } else {
+                    this.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_SUBMITTED, newSessionId);
+                }
             }
 
             // 檢查並啟動自動提交（如果條件滿足）

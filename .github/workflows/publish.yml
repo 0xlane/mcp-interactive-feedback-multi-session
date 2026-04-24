@@ -1,6 +1,9 @@
 name: Auto Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version_type:
@@ -17,9 +20,10 @@ on:
         required: false
         type: string
 
-# This workflow bumps the version, tags the commit, and creates a GitHub Release.
-# It does NOT publish to PyPI (this is a self-use fork) and does NOT build the
-# Tauri desktop shell (retired since v3.0).
+# Two trigger modes:
+#   1. Tag push (v*): version is already bumped locally; just create the GitHub Release.
+#   2. workflow_dispatch: bump version, commit, tag, push, then create the Release.
+# Neither publishes to PyPI (self-use fork) nor builds Tauri (retired since v3.0).
 
 jobs:
   release:
@@ -33,68 +37,79 @@ jobs:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
 
+    # --- version bump (workflow_dispatch only) ---
+
     - name: Install uv
+      if: github.event_name == 'workflow_dispatch'
       uses: astral-sh/setup-uv@v4
       with:
         version: "latest"
 
     - name: Set up Python
+      if: github.event_name == 'workflow_dispatch'
       run: uv python install
 
     - name: Install dependencies
+      if: github.event_name == 'workflow_dispatch'
       run: uv sync --dev
 
     - name: Configure Git
+      if: github.event_name == 'workflow_dispatch'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
 
     - name: Commit dependency changes if any
+      if: github.event_name == 'workflow_dispatch'
       run: |
         if [ -n "$(git status --porcelain)" ]; then
           git add .
           git commit -m "chore: sync lockfile before release" || true
         fi
 
-    - name: Get current version
-      id: current_version
-      run: |
-        CURRENT_VERSION=$(grep '^version =' pyproject.toml | cut -d'"' -f2)
-        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-        echo "Current version: $CURRENT_VERSION"
-
     - name: Determine new version
       id: bump_version
       run: |
-        CUSTOM_VERSION="${{ github.event.inputs.custom_version }}"
-
-        if [ -n "$CUSTOM_VERSION" ]; then
-          echo "🎯 Using custom version: $CUSTOM_VERSION"
-
-          if [[ ! "$CUSTOM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "❌ Error: Custom version must be in format X.Y.Z (e.g., 3.1.0)"
-            exit 1
-          fi
-
-          sed -i "s/^version = \".*\"/version = \"$CUSTOM_VERSION\"/" pyproject.toml
-          sed -i "s/^current_version = .*/current_version = $CUSTOM_VERSION/" .bumpversion.cfg
-
-          NEW_VERSION="$CUSTOM_VERSION"
-          echo "✅ Set custom version: $NEW_VERSION"
+        if [ "${{ github.event_name }}" = "push" ]; then
+          # Tag-push: extract version from the tag name
+          TAG_NAME="${{ github.ref_name }}"
+          NEW_VERSION="${TAG_NAME#v}"
+          echo "📌 Tag push detected: $TAG_NAME → version $NEW_VERSION"
         else
-          echo "🔄 Using automatic version bump: ${{ github.event.inputs.version_type }}"
-          uv run bump2version --allow-dirty ${{ github.event.inputs.version_type }}
-          NEW_VERSION=$(grep '^version =' pyproject.toml | cut -d'"' -f2)
-          echo "✅ Bumped version to: $NEW_VERSION"
+          # workflow_dispatch: bump or set version
+          CUSTOM_VERSION="${{ github.event.inputs.custom_version }}"
+
+          if [ -n "$CUSTOM_VERSION" ]; then
+            echo "🎯 Using custom version: $CUSTOM_VERSION"
+
+            if [[ ! "$CUSTOM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "❌ Error: Custom version must be in format X.Y.Z (e.g., 3.1.0)"
+              exit 1
+            fi
+
+            sed -i "s/^version = \".*\"/version = \"$CUSTOM_VERSION\"/" pyproject.toml
+            sed -i "s/^current_version = .*/current_version = $CUSTOM_VERSION/" .bumpversion.cfg
+
+            NEW_VERSION="$CUSTOM_VERSION"
+            echo "✅ Set custom version: $NEW_VERSION"
+          else
+            echo "🔄 Using automatic version bump: ${{ github.event.inputs.version_type }}"
+            uv run bump2version --allow-dirty ${{ github.event.inputs.version_type }}
+            NEW_VERSION=$(grep '^version =' pyproject.toml | cut -d'"' -f2)
+            echo "✅ Bumped version to: $NEW_VERSION"
+          fi
         fi
 
         echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "New version: $NEW_VERSION"
 
     - name: Update __init__.py version
+      if: github.event_name == 'workflow_dispatch'
       run: |
         NEW_VERSION="${{ steps.bump_version.outputs.new }}"
         sed -i "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" src/mcp_feedback_enhanced/__init__.py
+
+    # --- changelog verification & release notes (both triggers) ---
 
     - name: Verify CHANGELOG files
       run: |
@@ -212,7 +227,10 @@ jobs:
 
         echo "Release body generated successfully"
 
+    # --- commit & push (workflow_dispatch only) ---
+
     - name: Commit version bump
+      if: github.event_name == 'workflow_dispatch'
       run: |
         CUSTOM_VERSION="${{ github.event.inputs.custom_version }}"
         if [ -n "$CUSTOM_VERSION" ]; then
@@ -230,9 +248,12 @@ jobs:
         git tag "v${{ steps.bump_version.outputs.new }}"
 
     - name: Push changes and tags
+      if: github.event_name == 'workflow_dispatch'
       run: |
         git push origin main
         git push origin "v${{ steps.bump_version.outputs.new }}"
+
+    # --- create GitHub Release (both triggers) ---
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2

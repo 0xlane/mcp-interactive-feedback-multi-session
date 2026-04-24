@@ -520,23 +520,30 @@
 
     /**
      * 應用佈局模式
+     *
+     * 注意：除了更新 body class 之外，必須同步 #tab-combined 的佈局 class
+     * （combined-vertical / combined-horizontal），否則設定頁切換橫竖佈局後
+     * 需要重新整理頁面才會生效。
      */
     UIManager.prototype.applyLayoutMode = function(layoutMode) {
         this.layoutMode = layoutMode;
-        
+
         const expectedClassName = 'layout-' + layoutMode;
         if (document.body.className !== expectedClassName) {
             console.log('應用佈局模式: ' + layoutMode);
             document.body.className = expectedClassName;
         }
 
+        // 同步 #tab-combined 的佈局 class，讓 CSS 規則立即生效
+        this.handleCombinedMode();
+
         this.updateTabVisibility();
-        
+
         // 如果當前頁籤不是合併模式，則切換到合併模式頁籤
         if (this.currentTab !== 'combined') {
             this.currentTab = 'combined';
         }
-        
+
         // 觸發回調
         if (this.onLayoutModeChange) {
             this.onLayoutModeChange(layoutMode);

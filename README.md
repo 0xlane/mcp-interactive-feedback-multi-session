@@ -202,13 +202,32 @@ for every shortcut, the per-session draft behavior, and archiving semantics.
 
 ### 4. Prompt Engineering Setup
 
-For optimal results, add this rule to your AI assistant:
+For optimal results, install the **Cursor Skill** shipped with this repo so the
+agent automatically calls `interactive_feedback` after every task and loops on
+your feedback:
 
+```bash
+# Copy the skill into Cursor's user-level skill directory
+mkdir -p ~/.cursor/skills/interactive-feedback-loop
+cp docs/cursor-skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
 ```
-# MCP Interactive Feedback Rules
 
-follow mcp-feedback-enhanced instructions
-```
+The skill teaches the agent to:
+- Call `interactive_feedback` after every task (with Markdown summary)
+- Extract and reuse `feedback_session_id` across turns (session reuse)
+- Retry on MCP timeout errors instead of giving up
+- Never call the tool from a subagent (prevents hangs)
+
+> **Manual alternative** — if you don't use Cursor Skills, add this rule to your
+> AI assistant's system prompt instead:
+>
+> ```
+> # MCP Interactive Feedback Rules
+> follow mcp-feedback-enhanced instructions
+> ```
+
+See [`docs/cursor-skill/SKILL.md`](docs/cursor-skill/SKILL.md) for the full
+skill source.
 
 ## ⚙️ Advanced Settings
 

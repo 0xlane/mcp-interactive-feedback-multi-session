@@ -223,13 +223,30 @@ UI 依 **3 層資訊架構**組織，避免全域動作和會話級工作項混�
 
 ### 4. 設定提示工程
 
-為了獲得最佳效果，請在 AI 助手中加入以下規則：
+為了獲得最佳效果，安裝本倉庫自帶的 **Cursor Skill**，讓 Agent 在每次任務完成後
+自動呼叫 `interactive_feedback` 並基於你的回饋循環迭代：
 
+```bash
+# 將 Skill 複製到 Cursor 使用者級目錄
+mkdir -p ~/.cursor/skills/interactive-feedback-loop
+cp docs/cursor-skill/SKILL.md ~/.cursor/skills/interactive-feedback-loop/SKILL.md
 ```
-# MCP Interactive Feedback 規則
 
-注意在任務完成前根據mcp-feedback-enhanced工具的要求進行工具調用
-```
+該 Skill 會教 Agent：
+- 每次任務完成後呼叫 `interactive_feedback`（帶 Markdown 摘要）
+- 提取並複用 `feedback_session_id`（同一對話複用 session）
+- MCP 逾時錯誤時自動重試，而非放棄
+- 禁止 subagent 呼叫該工具（避免卡死）
+
+> **手動替代方案** —— 如果你不使用 Cursor Skills，可以在 AI 助手的系統提示詞中
+> 加入以下規則：
+>
+> ```
+> # MCP Interactive Feedback 規則
+> 注意在任務完成前根據mcp-feedback-enhanced工具的要求進行工具調用
+> ```
+
+詳見 [`docs/cursor-skill/SKILL.md`](docs/cursor-skill/SKILL.md)。
 
 ## ⚙️ 進階設定
 

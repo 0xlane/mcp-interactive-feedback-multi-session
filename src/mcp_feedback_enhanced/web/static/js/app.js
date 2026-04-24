@@ -475,9 +475,19 @@
                     if (!ev || !ev.session) return;
                     if (ev.session.session_id !== store.getActiveSessionId()) return;
                     self._renderSessionMeta(ev.session);
-                    // 狀態變化（例如 waiting → feedback_submitted）：同步按鈕 / 輸入框
                     var prevStatus = ev.prev && ev.prev.status;
                     if (prevStatus !== ev.session.status) {
+                        // session 復用：從已提交/完成/超時等狀態回到 waiting
+                        if (ev.session.status === 'waiting' && prevStatus &&
+                            prevStatus !== 'waiting' && prevStatus !== 'active') {
+                            var sid = ev.session.session_id;
+                            if (self._drafts) delete self._drafts[sid];
+                            if (self.uiManager) self.uiManager.resetFeedbackForm(true);
+                            if (self.imageHandler) self.imageHandler.clearImages();
+                            if (self.uiManager && ev.session.summary) {
+                                self.uiManager.updateAISummaryContent(ev.session.summary);
+                            }
+                        }
                         self._syncFeedbackStateToSession(ev.session);
                     }
                 });

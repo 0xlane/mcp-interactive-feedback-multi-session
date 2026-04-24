@@ -21,7 +21,7 @@ class CompressionConfig:
     compression_level: int = 6  # 壓縮級別 (1-9, 6為平衡點)
 
     # 緩存設定
-    static_cache_max_age: int = 3600  # 靜態文件緩存時間（秒）
+    static_cache_max_age: int = 0  # 靜態文件緩存時間（秒），0 = 不緩存（開發友好）
     api_cache_max_age: int = 0  # API 響應緩存時間（秒，0表示不緩存）
 
     # 支援的 MIME 類型
@@ -59,7 +59,7 @@ class CompressionConfig:
         return cls(
             minimum_size=int(os.getenv("MCP_GZIP_MIN_SIZE", "1000")),
             compression_level=int(os.getenv("MCP_GZIP_LEVEL", "6")),
-            static_cache_max_age=int(os.getenv("MCP_STATIC_CACHE_AGE", "3600")),
+            static_cache_max_age=int(os.getenv("MCP_STATIC_CACHE_AGE", "0")),
             api_cache_max_age=int(os.getenv("MCP_API_CACHE_AGE", "0")),
         )
 

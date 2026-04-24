@@ -556,9 +556,6 @@
             "audioNotFound": "找不到選擇的音效"
         }
     },
-    "stats": {
-        "detailedStats": "詳細統計資訊"
-    },
     "notification": {
         "title": "瀏覽器通知",
         "settingLabel": "瀏覽器通知",

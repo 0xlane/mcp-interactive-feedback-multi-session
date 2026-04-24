@@ -324,33 +324,15 @@
 
     /**
      * 更新顯示
+     *
+     * Phase 3 之後舊的底部「詳細統計面板」與相關舊版指標 DOM 已移除，
+     * WebSocket 指標（延遲、重連、訊息數、連線時間、會話數）改以頂部
+     * 連線點的 tooltip（`title` 屬性）呈現——懸停時一次性閱覽，平時不
+     * 佔用版面，也不再與側欄底部會話歷史按鈕重疊。
      */
     ConnectionMonitor.prototype.updateDisplay = function() {
-        // 更新延遲顯示
-        if (this.latencyDisplay) {
-            const latencyLabel = window.i18nManager ? window.i18nManager.t('connectionMonitor.latency') : '延遲';
-            if (this.currentLatency > 0) {
-                this.latencyDisplay.textContent = latencyLabel + ': ' + this.currentLatency + 'ms';
-            } else {
-                this.latencyDisplay.textContent = latencyLabel + ': --ms';
-            }
-        }
-        
-        if (this.latencyDisplayFooter) {
-            if (this.currentLatency > 0) {
-                this.latencyDisplayFooter.textContent = this.currentLatency + 'ms';
-            } else {
-                this.latencyDisplayFooter.textContent = '--ms';
-            }
-        }
-        
-        // 更新統計面板中的延遲顯示
-        const statsLatency = document.getElementById('statsLatency');
-        if (statsLatency) {
-            statsLatency.textContent = this.currentLatency > 0 ? this.currentLatency + 'ms' : '--ms';
-        }
-        
-        // 更新連線時間
+        const latencyStr = this.currentLatency > 0 ? this.currentLatency + 'ms' : '--ms';
+
         let connectionTimeStr = '--:--';
         if (this.connectionStartTime) {
             const duration = Math.floor((Date.now() - this.connectionStartTime) / 1000);
@@ -358,91 +340,66 @@
             const seconds = duration % 60;
             connectionTimeStr = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
         }
-        
-        if (this.connectionTimeDisplay) {
-            const connectionTimeLabel = window.i18nManager ? window.i18nManager.t('connectionMonitor.connectionTime') : '連線時間';
-            this.connectionTimeDisplay.textContent = connectionTimeLabel + ': ' + connectionTimeStr;
-        }
-        
-        // 更新統計面板中的連線時間
-        const statsConnectionTime = document.getElementById('statsConnectionTime');
-        if (statsConnectionTime) {
-            statsConnectionTime.textContent = connectionTimeStr;
-        }
-        
-        // 更新重連次數
-        if (this.reconnectCountDisplay) {
-            const reconnectLabel = window.i18nManager ? window.i18nManager.t('connectionMonitor.reconnectCount') : '重連';
-            const timesLabel = window.i18nManager ? window.i18nManager.t('connectionMonitor.times') : '次';
-            this.reconnectCountDisplay.textContent = reconnectLabel + ': ' + this.reconnectCount + ' ' + timesLabel;
-        }
-        
-        // 更新統計面板中的重連次數
-        const statsReconnectCount = document.getElementById('statsReconnectCount');
-        if (statsReconnectCount) {
-            statsReconnectCount.textContent = this.reconnectCount.toString();
-        }
-        
-        // 更新訊息計數
-        if (this.messageCountDisplay) {
-            this.messageCountDisplay.textContent = this.messageCount;
-        }
-        
-        // 更新統計面板中的訊息計數
-        const statsMessageCount = document.getElementById('statsMessageCount');
-        if (statsMessageCount) {
-            statsMessageCount.textContent = this.messageCount.toString();
-        }
-        
-        // 更新統計面板中的會話數和狀態
-        // Phase 3 之後舊的 #sessionCount / #sessionStatusText 元素已隨 UI 重構
-        // 一起被移除，原本從 DOM 拷文字的寫法永遠讀不到值，統計面板就永遠停留在
-        // HTML 初始硬編碼的 "1" / "等待中"，即便側欄已經清空也不會變。
-        // 這裡改為直接讀 sessionStore 作為單一資料源，並補上 i18n 對應。
-        var store = window.MCPFeedback && window.MCPFeedback.sessionStore;
-        const statsSessionCount = document.getElementById('statsSessionCount');
-        if (statsSessionCount) {
-            if (store && typeof store.getSessions === 'function') {
-                statsSessionCount.textContent = String(store.getSessions().length);
-            } else {
-                statsSessionCount.textContent = '0';
-            }
-        }
 
-        const statsSessionStatus = document.getElementById('statsSessionStatus');
-        if (statsSessionStatus) {
-            var statusText;
-            var statusI18nKey = null;
-            var activeSession = null;
-            if (store && typeof store.getActiveSessionId === 'function') {
-                var aid = store.getActiveSessionId();
-                if (aid && typeof store.getSession === 'function') {
-                    activeSession = store.getSession(aid);
-                }
+        const sessionsCount = (function () {
+            const store = window.MCPFeedback && window.MCPFeedback.sessionStore;
+            if (store && typeof store.getSessions === 'function') {
+                return store.getSessions().length;
             }
-            if (activeSession && activeSession.status) {
-                statusI18nKey = 'sessionStatus.' + activeSession.status;
-                var mgr = window.i18nManager;
-                statusText = (mgr && typeof mgr.t === 'function')
-                    ? mgr.t(statusI18nKey)
-                    : activeSession.status;
-                if (statusText === statusI18nKey) {
-                    // i18n 鍵未命中，退回原始狀態字串
-                    statusText = activeSession.status;
-                }
-            } else {
-                statusI18nKey = 'connectionMonitor.noActiveSession';
-                var mgr2 = window.i18nManager;
-                statusText = (mgr2 && typeof mgr2.t === 'function')
-                    ? mgr2.t(statusI18nKey)
-                    : '無活躍會話';
-                if (statusText === statusI18nKey) statusText = '無活躍會話';
+            return 0;
+        })();
+
+        this._updateMinimalIndicatorTooltip({
+            latency: latencyStr,
+            messages: this.messageCount,
+            reconnects: this.reconnectCount,
+            connectionTime: connectionTimeStr,
+            sessions: sessionsCount
+        });
+    };
+
+    /**
+     * 將指標整合成一個單行 tooltip 寫入頂部連線指示器，讓使用者 hover 時
+     * 能一次看到延遲 / 訊息數 / 重連次數 / 連線時間 / 會話數。
+     *
+     * 之所以每次都重建整串而非只更新變動欄位，是因為 `title` 屬性本身是
+     * 字串、成本極低；而且這個方法由 1s 一次的 display ticker 呼叫，頻
+     * 率穩定、可避免保存舊值造成語言切換時部分欄位殘留。
+     */
+    ConnectionMonitor.prototype._updateMinimalIndicatorTooltip = function(data) {
+        const indicator = document.getElementById('connectionStatusMinimal');
+        if (!indicator) return;
+
+        const statusText = indicator.querySelector('.status-text');
+        const statusLabel = statusText ? (statusText.textContent || '').trim() : '';
+
+        const mgr = window.i18nManager;
+        const t = function (key, fallback) {
+            if (mgr && typeof mgr.t === 'function') {
+                const v = mgr.t(key);
+                if (v && v !== key) return v;
             }
-            statsSessionStatus.textContent = statusText;
-            if (statusI18nKey) {
-                statsSessionStatus.setAttribute('data-i18n', statusI18nKey);
-            }
-        }
+            return fallback;
+        };
+
+        const sep = ' · ';
+        const labels = {
+            latency: t('connectionMonitor.latency', 'Latency'),
+            messages: t('connectionMonitor.metrics.messages', 'Messages'),
+            reconnects: t('connectionMonitor.reconnectCount', 'Reconnects'),
+            connectionTime: t('connectionMonitor.connectionTime', 'Connection Time'),
+            sessions: t('connectionMonitor.metrics.sessions', 'Sessions')
+        };
+
+        const parts = [];
+        if (statusLabel) parts.push(statusLabel);
+        parts.push(labels.latency + ' ' + data.latency);
+        parts.push(labels.messages + ' ' + data.messages);
+        parts.push(labels.reconnects + ' ' + data.reconnects);
+        parts.push(labels.connectionTime + ' ' + data.connectionTime);
+        parts.push(labels.sessions + ' ' + data.sessions);
+
+        indicator.setAttribute('title', parts.join(sep));
     };
 
     /**

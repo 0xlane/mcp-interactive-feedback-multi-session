@@ -551,9 +551,6 @@
             "audioNotFound": "找不到选择的音效"
         }
     },
-    "stats": {
-        "detailedStats": "详细统计信息"
-    },
     "notification": {
         "title": "浏览器通知",
         "settingLabel": "浏览器通知",

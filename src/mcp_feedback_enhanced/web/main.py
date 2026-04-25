@@ -282,7 +282,11 @@ class WebUIManager:
         @self.app.middleware("http")
         async def compression_and_cache_middleware(request: Request, call_next):
             """壓縮和緩存中間件"""
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            except RuntimeError:
+                from starlette.responses import Response as StarletteResponse
+                return StarletteResponse(status_code=500)
 
             # 添加緩存頭
             if not config.should_exclude_path(request.url.path):
@@ -297,7 +301,6 @@ class WebUIManager:
                 was_compressed = "gzip" in content_encoding
 
                 if content_length > 0:
-                    # 估算原始大小（如果已壓縮，假設壓縮比為 30%）
                     original_size = (
                         content_length
                         if not was_compressed
@@ -307,7 +310,6 @@ class WebUIManager:
                         original_size, content_length, was_compressed
                     )
             except (ValueError, TypeError):
-                # 忽略統計錯誤，不影響正常響應
                 pass
 
             return response

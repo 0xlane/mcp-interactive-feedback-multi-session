@@ -125,7 +125,47 @@ def build_daemon_app(
     # 在 launch_web_feedback_ui 中取得的是同一個 manager（帶 is_daemon 旗標）。
     set_web_ui_manager(manager)
 
-    manager.app.mount("/mcp", mcp_app)
+    # 在 MCP sub-app 外包一層日誌：僅在客戶端連接/斷開時打印 INFO
+    original_mcp_app = mcp_app
+    _known_mcp_sessions: set[str] = set()
+
+    async def mcp_logging_middleware(scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            from starlette.requests import Request as _Req
+            req = _Req(scope, receive)
+            session_hdr = req.headers.get("mcp-session-id")
+            method = req.method
+
+            if method == "DELETE" and session_hdr:
+                _logger.info("[MCP] client disconnected (session=%s)", session_hdr)
+                _known_mcp_sessions.discard(session_hdr)
+
+            # 攔截響應 header 以偵測新 session 建立
+            captured_session_id: list[str] = []
+
+            async def send_wrapper(message: dict) -> None:
+                if message.get("type") == "http.response.start":
+                    headers = dict(
+                        (k.decode() if isinstance(k, bytes) else k,
+                         v.decode() if isinstance(v, bytes) else v)
+                        for k, v in message.get("headers", [])
+                    )
+                    resp_sid = headers.get("mcp-session-id")
+                    if resp_sid and resp_sid not in _known_mcp_sessions:
+                        captured_session_id.append(resp_sid)
+                await send(message)
+
+            await original_mcp_app(scope, receive, send_wrapper)
+
+            if captured_session_id:
+                sid = captured_session_id[0]
+                _known_mcp_sessions.add(sid)
+                _logger.info("[MCP] new client connected (session=%s)", sid)
+            return
+
+        await original_mcp_app(scope, receive, send)
+
+    manager.app.mount("/mcp", mcp_logging_middleware)
     debug_log(f"Mounted MCP sub-app at /mcp (host={host}, port={port})")
 
     return manager.app, manager

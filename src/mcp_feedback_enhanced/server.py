@@ -475,6 +475,12 @@ async def interactive_feedback(
     Returns:
         list: List containing TextContent and MCPImage objects representing user feedback
     """
+    debug_log(
+        f"[MCP] interactive_feedback 被調用 "
+        f"(title={title!r}, project={project_directory!r}, "
+        f"feedback_session_id={feedback_session_id!r}, timeout={timeout})"
+    )
+
     # 環境偵測
     is_remote = is_remote_environment()
     is_wsl = is_wsl_environment()
@@ -630,6 +636,7 @@ def get_system_info() -> str:
     Returns:
         str: JSON 格式的系統資訊
     """
+    debug_log("[MCP] get_system_info 被調用")
     is_remote = is_remote_environment()
     is_wsl = is_wsl_environment()
 

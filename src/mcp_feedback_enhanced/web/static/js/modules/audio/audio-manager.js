@@ -196,6 +196,7 @@
             return;
         }
 
+        var self = this;
         // 嘗試播放
         this.playAudio(audioData)
             .then(() => {
@@ -204,10 +205,13 @@
             })
             .catch((error) => {
                 if (error.name === 'NotAllowedError') {
-                    // 自動播放被阻止
-                    this.autoplayBlocked = true;
-                    this.addToPendingNotifications(audioData);
-                    this.showAutoplayBlockedNotification();
+                    self.autoplayBlocked = true;
+                    self.addToPendingNotifications(audioData);
+                    // 僅在用戶已有交互卻仍被阻止時才彈通知；
+                    // 頁面剛載入尚無手勢的情況下靜默等待即可。
+                    if (self.userHasInteracted) {
+                        self.showAutoplayBlockedNotification();
+                    }
                 }
             });
     };

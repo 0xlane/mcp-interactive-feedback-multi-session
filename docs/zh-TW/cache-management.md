@@ -2,8 +2,7 @@
 
 > v3.0 說明：本自用分支從原始碼安裝（`uv sync`），守護程序透過
 > `uv run mcp-interactive-feedback serve --http` 從倉庫目錄啟動。執行
-> 快取清理前請先停止 daemon（Ctrl+C 或
-> `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`），或使用
+> 快取清理前請先停止 daemon（Ctrl+C），或使用
 > `--force` 讓清理腳本嘗試先結束相關程序。
 
 ## 🔍 問題說明
@@ -51,8 +50,7 @@ python scripts/cleanup_cache.py --force
 
 **解決方案**：
 1. **關閉相關程序**：
-   - 停止 daemon（在啟動終端按 Ctrl+C，或
-     `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`）
+   - 停止 daemon（在啟動終端按 Ctrl+C）
    - 關閉 Cursor / Claude / 其他仍持有 MCP 會話的 AI Agent 客戶端
    - 結束所有 `uvx` 相關程序
 
@@ -139,8 +137,7 @@ python scripts/cleanup_cache.py --clean
 
 ### 解決步驟
 
-1. 停止 daemon（Ctrl+C 或 `kill` daemon.pid 中的 PID），並關閉仍持有
-   MCP 會話的 AI Agent 客戶端
+1. 停止 daemon（Ctrl+C），並關閉仍持有 MCP 會話的 AI Agent 客戶端
 2. 以管理員身份運行清理命令
 3. 如果仍然失敗，重啟電腦後再試
 4. 考慮手動刪除部分 cache 目錄

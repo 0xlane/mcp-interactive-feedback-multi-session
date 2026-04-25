@@ -28,7 +28,7 @@
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 - 可写目录：
-  - `~/.config/mcp-feedback-enhanced/`（PID 锁、ui_settings.json、
+  - `~/.config/mcp-feedback-enhanced/`（ui_settings.json、
     session_history.json）
   - `~/.cache/uv/`（uv 下载缓存；参见
     [`../en/cache-management.md`](../en/cache-management.md) /
@@ -84,24 +84,12 @@ http://127.0.0.1:8765
 | `--host` | `127.0.0.1` | 绑定地址。跨主机请改成 `0.0.0.0` 或内网 IP，并自觉加防火墙/端口转发 |
 | `--port` | `8765` | 被占用**不会**自动递增，直接失败。固定端口有助于 `mcp.json` 稳定 |
 | `--log-level` | `info` | `critical` / `error` / `warning` / `info` / `debug` / `trace` |
-| `--pid-file PATH` | `~/.config/mcp-feedback-enhanced/daemon.pid` | 若要跑两个不同端口的 daemon（极少见），请显式分开 PID 文件 |
 
 ### 2.2 日志
 
 `info` 级已经包含所有业务级事件；排查复杂问题时切到 `debug`。
 终端日志不落盘；若要长时间保留，请配合 `tee`、`systemd` 或外置日志
 管理工具。
-
-### 2.3 单实例锁
-
-- 再次执行 `serve --http` 会读取 `daemon.pid`，若 PID 仍活就打印：
-  ```
-  ✗ daemon already running at 127.0.0.1:8765 (pid=12345)
-    提示：若确认前一个 daemon 已死，可手动删除 PID 文件后重试。
-  ```
-- 原 PID 已死（例如 kill -9）时会自动回收，正常启动。
-- 强行清理：`rm ~/.config/mcp-feedback-enhanced/daemon.pid`（仅在确认
-  没有活着的 daemon 时）。
 
 ---
 

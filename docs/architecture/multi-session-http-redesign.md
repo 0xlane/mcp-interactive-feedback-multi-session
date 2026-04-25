@@ -140,7 +140,6 @@ graph LR
 **后端**
 
 - `mcp-interactive-feedback serve --http [--host 127.0.0.1] [--port 8765]` 子命令
-- 单实例锁（PID 文件 + 端口占用检测）
 - FastAPI 挂载 MCP ASGI 子应用
 - 新 API：
   - `GET /api/sessions` — 活跃 + 最近完成的全量会话（已有 `/api/all-sessions`，扩展字段即可）
@@ -388,18 +387,11 @@ mcp-interactive-feedback serve --http
 | `--host` | `127.0.0.1` | 固定绑本地回环，不对外暴露 |
 | `--port` | `8765` | 固定端口，冲突时直接报错退出 |
 
-### 6.2 单实例锁
-
-- `~/.config/mcp-feedback-enhanced/daemon.pid` 写入 PID；
-- 启动时检测：PID 存在且进程仍在 → 拒绝启动并提示已在运行；
-- PID 存在但进程已死 → 清理后继续；
-- 端口被占 → 不自动切换端口，直接报错提示用户手动处理。
-
-### 6.3 鉴权
+### 6.2 鉴权
 
 **不启用**。使用场景是本地单用户（`127.0.0.1`），无需 Token。
 
-### 6.4 Agent 端配置
+### 6.3 Agent 端配置
 
 用户手动把 `mcp.json` 从 stdio 形式改为 HTTP 形式（见 §5.1 示例）。不提供自动迁移命令。stdio 模式**不保留兜底**——直接在 v3.0 切换，改造彻底。
 
@@ -444,21 +436,15 @@ mcp-interactive-feedback serve --http
 - ✅ `src/mcp_feedback_enhanced/daemon.py`：`build_daemon_app(host, port)` 把
   `mcp.http_app(path="/")` 挂载到 FastAPI `/mcp`，`serve_http(host, port, pid_path)`
   前台运行 uvicorn；
-- ✅ `src/mcp_feedback_enhanced/utils/pid_lock.py`：`DaemonPidLock` 单例锁，
-  默认写 `~/.config/mcp-feedback-enhanced/daemon.pid`，支持 stale lock 回收；
-  清理策略依赖 `atexit`（uvicorn 对 SIGINT/SIGTERM 的优雅关机会触发
-  正常退出链），不自装 signal handler 以免与 pytest / ResourceManager /
-  uvicorn 的清理链相互干扰；`MCP_FEEDBACK_PID_FILE` 环境变量可覆盖默认路径；
 - ✅ `WebUIManager` 新增 `is_daemon` + `lifespan` 参数，daemon 模式下跳过
   `start_server` / 端口自动递增 / `smart_open_browser`；
 - ✅ `launch_web_feedback_ui` daemon 分支：仅 `create_session` +
   `notify_existing_tab_to_refresh`，不再自启 uvicorn；
 - ✅ `__main__.py` 新增 `serve` 子命令（`--http / --host / --port /
-  --log-level / --pid-file`），`AlreadyRunningError` 转成非零退出码；
-- ✅ 集成测试 `tests/integration/test_daemon_http.py`（8 个 test，含
+  --log-level`）；
+- ✅ 集成测试 `tests/integration/test_daemon_http.py`（含
   `/` / `/api/all-sessions` / `/mcp/ initialize` / `tools/list` / 全局
-  manager 注入 / PID 锁冲突）+ 单元测试 `tests/unit/test_pid_lock.py`
-  （12 个 test）；
+  manager 注入）；
 - ✅ 使用指南 [`phase2-http-daemon-usage.md`](./phase2-http-daemon-usage.md)
   （`uvx serve --http` 启动、`mcp.json` 迁移样例、端点清单、FAQ）；
 - ⏳ 三语种 README 正式更新推迟到阶段 5 统一做。
@@ -644,7 +630,6 @@ test 全过，没有引入新回归。
 |---|---|---|
 | `src/mcp_feedback_enhanced/server.py` | MCP 服务器入口、`interactive_feedback` tool | ✅ 已接入 `mcp.http_app()`；stdio 入口标记废弃 |
 | `src/mcp_feedback_enhanced/daemon.py` | 阶段 2 新增：`build_daemon_app(host, port)` + `serve_http` | ✅ FastAPI 合并 MCP ASGI 子应用，uvicorn 前台运行 |
-| `src/mcp_feedback_enhanced/utils/pid_lock.py` | 阶段 2 新增：`DaemonPidLock` 单实例锁 | ✅ `~/.config/mcp-feedback-enhanced/daemon.pid` + stale 回收 |
 | `src/mcp_feedback_enhanced/web/main.py` | `WebUIManager` 单例 | ✅ 粘滞 active 指针 + `build_sessions_snapshot` + `cancel_session` 真删；保留 `current_session` 属性作为「前端视图焦点」 |
 | `src/mcp_feedback_enhanced/web/routes/main_routes.py` | FastAPI 路由、WS 端点 | ✅ `/` 总是返回 `feedback.html` SPA 壳；WS 多路复用 + 新增 `set_active_session` / `sessions_snapshot` 事件；`/api/sessions/{sid}/archive` 已上线 |
 | `src/mcp_feedback_enhanced/web/models/feedback_session.py` | `WebFeedbackSession` 状态机 | ✅ 已有 `CANCELED` 状态；孤儿检测使用 `_cleanup_done` + 字典 pop 组合兜底 |
@@ -658,7 +643,7 @@ test 全过，没有引入新回归。
 | `src/mcp_feedback_enhanced/web/static/js/modules/session/session-data-manager.js` | 会话数据（历史单会话逻辑） | ✅ 保留兼容；多会话语义由 `session-store.js` 接管 |
 | `src/mcp_feedback_enhanced/web/static/js/modules/session-manager.js` | 会话 UI 顶层（历史） | ✅ 保留兼容；侧栏 + 详情已由新组件接管 |
 | `src/mcp_feedback_enhanced/web/static/js/app.js` | FeedbackApp | ✅ `_drafts` + `applyActiveSessionToUI` + `_renderEmptyState` + `_syncFeedbackStateToSession` |
-| `src/mcp_feedback_enhanced/__main__.py` | CLI | ✅ `serve --http --host --port --log-level --pid-file` |
+| `src/mcp_feedback_enhanced/__main__.py` | CLI | ✅ `serve --http --host --port --log-level` |
 | `tests/unit/test_multi_session.py` | 多会话单测（Phase 1 新增） | ✅ 更新粘滞语义 + 新增 `test_session_lookup_by_id_after_sticky_active` 回归 |
 | `tests/integration/test_ws_multiplex.py` | WS 多路复用集成测（Phase 3 新增） | ✅ 覆盖 `sessions_snapshot` / `set_active_session` / 路由 |
 | `scripts/dev_sim_feedback.py` | 开发辅助（Phase 3 新增） | ✅ 本地 HTTP transport 下模拟 MCP 调用 |

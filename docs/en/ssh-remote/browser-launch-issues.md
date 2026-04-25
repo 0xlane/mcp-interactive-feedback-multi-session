@@ -118,15 +118,6 @@ A: Another `mcp-feedback-enhanced` process or an unrelated service is
 using 8765. Either stop it (`lsof -i :8765` → kill the PID), or pass
 `--port 18765` and forward that port instead.
 
-**Q: PID lock says daemon is already running but I can't find the
-process.**
-A: Stale lock. Delete the file and retry:
-
-```bash
-rm ~/.config/mcp-feedback-enhanced/daemon.pid
-uv run mcp-interactive-feedback serve --http
-```
-
 **Q: My agent keeps connecting to port 8765 on the laptop but the
 daemon is on the server — nothing happens.**
 A: SSH port forwarding is not actually active. Re-check §2, and verify
@@ -148,9 +139,8 @@ v3.0 deliberately does not ship LaunchAgent / systemd templates
 
 **Q: Can I share one daemon across multiple users on the same remote
 box?**
-A: Not recommended. The PID lock is per-user (`~/.config/...`), but
-you'd share the session list across people — privacy hazard. Spin up
-one daemon per user on different ports.
+A: Not recommended. The session list would be shared across people —
+privacy hazard. Spin up one daemon per user on different ports.
 
 **Q: WebSocket shows "disconnected" in the browser console after a
 Wi-Fi blip.**

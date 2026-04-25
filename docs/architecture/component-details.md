@@ -9,12 +9,11 @@
 
 1. [CLI 入口 (`__main__.py`)](#1-cli-入口-__main__py)
 2. [HTTP Daemon (`daemon.py`)](#2-http-daemon-daemonpy)
-3. [PID 锁 (`utils/pid_lock.py`)](#3-pid-锁-utilspid_lockpy)
-4. [MCP 工具层 (`server.py`)](#4-mcp-工具层-serverpy)
-5. [`WebUIManager` (`web/main.py`)](#5-webuimanager-webmainpy)
-6. [`WebFeedbackSession` (`web/models/feedback_session.py`)](#6-webfeedbacksession-webmodelsfeedback_sessionpy)
-7. [HTTP / WS 路由 (`web/routes/main_routes.py`)](#7-http--ws-路由-webroutesmain_routespy)
-8. [前端模块地图](#8-前端模块地图)
+3. [MCP 工具层 (`server.py`)](#3-mcp-工具层-serverpy)
+4. [`WebUIManager` (`web/main.py`)](#4-webuimanager-webmainpy)
+5. [`WebFeedbackSession` (`web/models/feedback_session.py`)](#5-webfeedbacksession-webmodelsfeedback_sessionpy)
+6. [HTTP / WS 路由 (`web/routes/main_routes.py`)](#6-http--ws-路由-webroutesmain_routespy)
+7. [前端模块地图](#7-前端模块地图)
 
 ---
 
@@ -25,7 +24,7 @@ argparse 入口。v3.0 后的子命令：
 
 | 子命令 | 用途 | 状态 |
 | --- | --- | --- |
-| `serve [--http] [--host 127.0.0.1] [--port 8765] [--log-level info] [--pid-file PATH]` | 启动 HTTP 单实例多会话 daemon（**推荐**） | 稳定 |
+| `serve [--http] [--host 127.0.0.1] [--port 8765] [--log-level info]` | 启动 HTTP 多会话 daemon（**推荐**） | 稳定 |
 | `server` | 以 stdio 方式启动 MCP 服务器 | 过渡保留，将在后续阶段移除 |
 | `test [--web] [--desktop] [--timeout 60]` | 诊断/自检 | 保留 |
 | `version` | 打印版本 | 保留 |
@@ -36,11 +35,6 @@ argparse 入口。v3.0 后的子命令：
   式绑到可信内网 IP（另见 `ssh-remote/` 指南）。
 - `--port` 默认 `8765`，**被占用时直接失败**（不做自动 +1 试探），
   方便外部 Agent 用固定 URL。
-- `--pid-file` 可覆盖 PID 文件路径，默认
-  `~/.config/mcp-feedback-enhanced/daemon.pid`。
-
-`run_serve_http()` 会捕获 `AlreadyRunningError`，提示用户检查
-现有 daemon 并以退出码 `2` 终止。
 
 ---
 
@@ -52,7 +46,6 @@ argparse 入口。v3.0 后的子命令：
 def build_daemon_app(manager: WebUIManager) -> FastAPI: ...
 def serve_http(
     *, host: str, port: int, log_level: str,
-    pid_path: Path | None,
 ) -> None: ...
 ```
 
@@ -66,36 +59,14 @@ def serve_http(
 4. 注入 startup/shutdown 钩子，绑定到 `WebUIManager` 的初始化与清理。
 5. 返回已装配完毕的 FastAPI 应用。
 
-**`serve_http`** 在 `build_daemon_app` 外层再套一层 PID 锁与 `atexit`
-清理：
+**`serve_http`** 在 `build_daemon_app` 外层启动 uvicorn：
 
-- 获取 `DaemonPidLock`；失败时抛 `AlreadyRunningError`，由 CLI 层
-  译成用户可读提示。
-- 将实际绑定的 `host:port` 写进 PID 文件，供第二次启动/排障脚本
-  读取。
 - 使用 `uvicorn.run(app, host=host, port=port, log_level=log_level)`
   阻塞运行。
 
 ---
 
-## 3. PID 锁 (`utils/pid_lock.py`)
-
-实现「机器级单实例」与「快速识别僵尸 PID」两个需求：
-
-```python
-class DaemonPidLock:
-    def acquire(self) -> None       # 拿不到就抛 AlreadyRunningError
-    def release(self) -> None       # atexit 调用
-    def write_endpoint(self, host, port) -> None
-```
-
-- PID 文件里的内容是 `pid:port` 或 `pid host:port`；
-- `_pid_alive(pid)` 用 `os.kill(pid, 0)` 判活，避免误判僵尸；
-- 默认路径 `~/.config/mcp-feedback-enhanced/daemon.pid`。
-
----
-
-## 4. MCP 工具层 (`server.py`)
+## 3. MCP 工具层 (`server.py`)
 
 只暴露一个工具 `interactive_feedback`：
 
@@ -124,7 +95,7 @@ async def interactive_feedback(
 
 ---
 
-## 5. `WebUIManager` (`web/main.py`)
+## 4. `WebUIManager` (`web/main.py`)
 
 进程级单例，保存所有运行时状态。核心字段（简化）：
 
@@ -139,7 +110,7 @@ class WebUIManager:
     _pending_session_update: bool
 ```
 
-### 5.1 会话管理
+### 4.1 会话管理
 
 | 方法 | 说明 |
 | --- | --- |
@@ -150,7 +121,7 @@ class WebUIManager:
 | `clear_current_session()` | 归档/清空当前会话 |
 | `cancel_session(session_id, reason=None)` | 主动取消；若取消的是当前活跃会话，由 `_select_fallback_active_session` 挑一个合适的接替者 |
 
-### 5.2 连接与广播
+### 4.2 连接与广播
 
 | 方法 | 说明 |
 | --- | --- |
@@ -159,7 +130,7 @@ class WebUIManager:
 | `broadcast_session_event(session_id, type, payload)` | 封装为 `{session_id, type, data}` 的多路复用事件 |
 | `build_sessions_snapshot()` | 返回按 `created_at DESC` + `_creation_seq DESC` 排序的会话摘要列表（REST `/api/sessions` 与 WS 初次同步共用） |
 
-### 5.3 粘滞活跃指针规则
+### 4.3 粘滞活跃指针规则
 
 `create_session` 的判定：
 
@@ -176,7 +147,7 @@ if not prior_active_valid:
 - 所以「新会话到来是否抢占视图」完全由前端的 `set_active_session`
   控制，后端只做兜底。
 
-### 5.4 清理策略
+### 4.4 清理策略
 
 - `cleanup_expired_sessions()`：定期清理超过保留期、已终态的会话；
 - `cleanup_sessions_by_memory_pressure(force=False)`：内存压力触发；
@@ -184,7 +155,7 @@ if not prior_active_valid:
 
 ---
 
-## 6. `WebFeedbackSession` (`web/models/feedback_session.py`)
+## 5. `WebFeedbackSession` (`web/models/feedback_session.py`)
 
 单个会话的状态机 + 数据载体。
 
@@ -220,7 +191,7 @@ class SessionStatus(Enum):
 
 ---
 
-## 7. HTTP / WS 路由 (`web/routes/main_routes.py`)
+## 6. HTTP / WS 路由 (`web/routes/main_routes.py`)
 
 `setup_routes(manager)` 里注册所有 HTTP / WS 端点。主要路由：
 
@@ -274,7 +245,7 @@ class SessionStatus(Enum):
 
 ---
 
-## 8. 前端模块地图
+## 7. 前端模块地图
 
 根模板：`web/templates/feedback.html`（SPA 外壳）。静态资源位于
 `web/static/js/` 与 `web/static/css/`。

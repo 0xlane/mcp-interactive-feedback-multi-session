@@ -13,34 +13,23 @@ sequenceDiagram
     participant U as 用户终端
     participant M as __main__.py
     participant D as daemon.serve_http
-    participant L as DaemonPidLock
     participant F as FastAPI app
     participant W as WebUIManager
 
     U->>M: uv run mcp-interactive-feedback serve --http --port 8765
     M->>D: run_serve_http(args)
-    D->>L: acquire()
-    alt 已有存活 daemon
-        L-->>D: AlreadyRunningError(pid, endpoint)
-        D-->>M: raise
-        M-->>U: 打印提示，退出码 2
-    else 拿到锁
-        L->>L: 写入 PID 文件（pid:host:port）
-        D->>W: new WebUIManager()
-        D->>F: build_daemon_app(W)
-        F->>F: 挂载 FastMCP /mcp + FastAPI 路由
-        D->>F: uvicorn.run(app, host, port)
-        F-->>U: 监听 127.0.0.1:8765
-    end
+    D->>W: new WebUIManager()
+    D->>F: build_daemon_app(W)
+    F->>F: 挂载 FastMCP /mcp + FastAPI 路由
+    D->>F: uvicorn.run(app, host, port)
+    F-->>U: 监听 127.0.0.1:8765
 
     Note right of U: 用户手动打开 http://127.0.0.1:8765
 ```
 
 关键点：
 
-- **单实例锁** 是进程级的，绑定到 PID 文件；意外崩溃留下的死锁文件
-  通过 `_pid_alive` 检查自动回收。
-- PID 文件里同时记录端口，方便 SSH 脚本/排障时免去 `ss -tln` 的步骤。
+- 端口被占用时直接失败（不做自动递增），方便 `mcp.json` 配固定 URL。
 
 ---
 
@@ -259,19 +248,13 @@ sequenceDiagram
     participant U as 用户
     participant Uv as uvicorn
     participant W as WebUIManager
-    participant L as DaemonPidLock
 
     U->>Uv: Ctrl+C / kill PID
     Uv->>Uv: signal handler
     Uv->>W: shutdown event
     W->>W: cleanup 所有会话（异步 -> 同步兜底）
     W-->>Uv: 广播 server_shutdown
-    Uv->>L: atexit -> release()
-    L->>L: 删除 PID 文件
 ```
-
-若 PID 文件残留（kill -9 等极端情况），下次 `serve --http` 会用
-`_pid_alive` 确认对应 PID 已死，然后自动覆盖；用户也可手动删掉。
 
 ---
 

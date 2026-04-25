@@ -24,16 +24,6 @@ uv run python -m mcp_feedback_enhanced serve --http
 | `--host` | `127.0.0.1` | 绑定主机，**强烈建议保持默认**（本地单用户场景，不做鉴权） |
 | `--port` | `8765` | 绑定端口；被占用直接报错退出，不做自动递增 |
 | `--log-level` | `info` | uvicorn 日志级别 |
-| `--pid-file` | `~/.config/mcp-feedback-enhanced/daemon.pid` | PID 文件路径 |
-
-### PID 冲突
-
-- 同用户下只允许一个 Daemon 运行；第二次启动会报：
-  ```
-  ✗ mcp-interactive-feedback daemon already running (pid=NNNN, pidfile=...)
-    提示：若确认前一个 daemon 已死，可手动删除 PID 文件后重试。
-  ```
-- 正常退出（Ctrl+C / `kill <pid>`）会自动清理 PID 文件；异常退出遗留的 PID 文件会在下次启动时被识别为 stale lock 并回收（前提：PID 对应的进程已死）。
 
 ## 2. 配置 `mcp.json`
 
@@ -94,8 +84,8 @@ Daemon 启动后对外开放：
 
 ## 5. 常见问题
 
-**Q：启动报 `daemon already running`**
-A：先检查 `lsof -i :8765` 或 `ps | grep mcp_feedback_enhanced`。若进程已死仅残留 PID 文件，直接删除 `~/.config/mcp-feedback-enhanced/daemon.pid` 后重试即可。
+**Q：端口被占用无法启动**
+A：先检查 `lsof -i :8765` 或 `ps | grep mcp_feedback_enhanced`。若有旧进程在运行，先停掉再重试；若端口被其他程序占用，可用 `--port` 指定其他端口。
 
 **Q：MCP 工具返回 404**
 A：确认 `mcp.json` 的 `url` 字段尾部有 `/`。访问 `/mcp`（无尾斜线）会被 307 重定向到 `/mcp/`，大部分 MCP 客户端会自动跟随。

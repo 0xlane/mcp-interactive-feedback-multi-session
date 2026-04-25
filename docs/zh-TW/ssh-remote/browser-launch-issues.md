@@ -111,14 +111,6 @@ A：其他 `mcp-feedback-enhanced` 進程或別的服務佔著 8765。要麼停
 （`lsof -i :8765` → 殺 PID），要麼 `--port 18765` 換端口並同步改
 SSH 轉發。
 
-**Q：PID 鎖說 daemon 正在執行但我找不到進程。**
-A：Stale lock。刪掉檔案再重啟：
-
-```bash
-rm ~/.config/mcp-feedback-enhanced/daemon.pid
-uv run mcp-interactive-feedback serve --http
-```
-
 **Q：agent 一直連本地 8765，但 daemon 在伺服器上——沒反應。**
 A：SSH 端口轉發其實沒生效。回到 §2 重新檢查，先用
 `curl http://localhost:8765/api/all-sessions` 從筆電驗證能通，再
@@ -136,8 +128,8 @@ v3.0 刻意不提供 LaunchAgent / systemd 範本（設計決議見
 [multi-session-http-redesign.md §7.14](../../architecture/multi-session-http-redesign.md)）。
 
 **Q：同一台遠端機上能否多個用戶共用一個 daemon？**
-A：不推薦。PID 鎖按用戶隔離（`~/.config/...`），但會話列表會在所有
-存取者之間共享——隱私風險。每人起自己的 daemon，分配不同端口。
+A：不推薦。會話列表會在所有存取者之間共享——隱私風險。每人起自己的
+daemon，分配不同端口。
 
 **Q：瀏覽器 console 偶爾顯示 WebSocket "disconnected"（網路抖動之後）。**
 A：頁面會自動重連。若沒有，重新整理即可——會話狀態全部在伺服端，

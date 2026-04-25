@@ -53,8 +53,7 @@ python scripts/cleanup_cache.py --force
 
 **Solutions**:
 1. **Close related processes**:
-   - Stop the daemon (`Ctrl+C` in the terminal where it was launched,
-     or `kill $(cat ~/.config/mcp-feedback-enhanced/daemon.pid)`)
+   - Stop the daemon (`Ctrl+C` in the terminal where it was launched)
    - Close any Cursor / Claude / other AI agents that may still have
      MCP sessions open
    - Terminate all `uvx` related processes
@@ -144,8 +143,8 @@ python scripts/cleanup_cache.py --clean
 
 ### Resolution Steps
 
-1. Stop the daemon (Ctrl+C / kill PID in `daemon.pid`) and close any
-   AI-agent clients that may still hold MCP sessions
+1. Stop the daemon (Ctrl+C) and close any AI-agent clients that may
+   still hold MCP sessions
 2. Run cleanup command as administrator
 3. If still failing, restart computer and try again
 4. Consider manually deleting parts of cache directory

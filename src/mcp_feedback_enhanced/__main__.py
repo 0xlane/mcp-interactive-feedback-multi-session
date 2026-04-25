@@ -75,12 +75,6 @@ def main():
         choices=["critical", "error", "warning", "info", "debug", "trace"],
         help="uvicorn 日誌級別（預設 info）",
     )
-    serve_parser.add_argument(
-        "--pid-file",
-        type=str,
-        default=None,
-        help="PID 文件路徑，覆寫預設的 ~/.config/mcp-feedback-enhanced/daemon.pid",
-    )
 
     # 測試命令
     test_parser = subparsers.add_parser("test", help="執行測試")
@@ -122,31 +116,15 @@ def run_server():
 
 def run_serve_http(args):
     """啟動 HTTP 單實例多會話 daemon。"""
-    # --http 目前僅作為明確標記，即使未傳也默認走 HTTP 分支
-    from pathlib import Path
-
     from .daemon import serve_http
-    from .utils.pid_lock import AlreadyRunningError
-
-    pid_path = Path(args.pid_file).expanduser() if args.pid_file else None
 
     try:
         serve_http(
             host=args.host,
             port=args.port,
             log_level=args.log_level,
-            pid_path=pid_path,
         )
-    except AlreadyRunningError as exc:
-        # 將鎖衝突轉成清晰的使用者訊息 + 非零退出碼
-        print(f"✗ {exc}", file=sys.stderr)
-        print(
-            "  提示：若確認前一個 daemon 已死，可手動刪除 PID 文件後重試。",
-            file=sys.stderr,
-        )
-        sys.exit(2)
     except KeyboardInterrupt:
-        # uvicorn 的 Ctrl-C 已自行處理，這裡只吸收堆疊
         pass
 
 

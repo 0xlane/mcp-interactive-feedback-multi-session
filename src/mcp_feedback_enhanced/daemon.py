@@ -11,10 +11,9 @@ HTTP Daemon
   與 ``/ws`` / ``/api/...`` 等介面。
 
 與階段 1（stdio）相比的差異：
-1. 單一長駐進程，由 :class:`~mcp_feedback_enhanced.utils.pid_lock.DaemonPidLock`
-   保證同一時刻僅有一個實例在運行；
-2. 固定綁定 ``127.0.0.1:8765``（可由 CLI 覆寫），不再做自動端口遞增；
-3. 不主動打開瀏覽器，也不在背景啟動額外 uvicorn 線程 —— 入口即 uvicorn。
+1. 單一長駐進程，固定綁定 ``127.0.0.1:8765``（可由 CLI 覆寫），
+   不再做自動端口遞增；
+2. 不主動打開瀏覽器，也不在背景啟動額外 uvicorn 線程 —— 入口即 uvicorn。
 
 設計原則：
 - 本模組不依賴 `__main__.py`，便於在測試中直接 `import` 後啟動一個臨時
@@ -28,13 +27,11 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 import uvicorn
 
 from .debug import server_debug_log as debug_log
-from .utils.pid_lock import AlreadyRunningError, DaemonPidLock
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -92,8 +89,7 @@ def build_daemon_app(
 
         - startup: 把 MCP ``streamable_http_session_manager`` 啟動；
         - shutdown: 先 broadcast ``shutting_down`` 讓前端 tab 顯示斷線提示，
-          再走 MCP 的關閉流程；PID 文件由 :class:`DaemonPidLock` 的 atexit
-          與 signal handler 鏈負責清理。
+          再走 MCP 的關閉流程。
         """
         async with mcp_app.lifespan(app):
             debug_log("daemon lifespan started: MCP session manager online")
@@ -169,7 +165,6 @@ def serve_http(
     port: int = DEFAULT_PORT,
     *,
     log_level: str = "info",
-    pid_path: Path | None = None,
 ) -> None:
     """以前台方式啟動 HTTP daemon。函式返回即表示 daemon 已退出。
 
@@ -177,38 +172,20 @@ def serve_http(
         host: 綁定主機，預設 ``127.0.0.1``。
         port: 綁定端口，預設 ``8765``。
         log_level: uvicorn 日誌級別。
-        pid_path: PID 文件路徑，``None`` 表示使用
-            :func:`~mcp_feedback_enhanced.utils.pid_lock.default_pid_path`。
-
-    Raises:
-        AlreadyRunningError: 同一 PID 文件已被另一個存活進程佔用。
     """
-    lock = DaemonPidLock(pid_path)
-    try:
-        lock.acquire()
-    except AlreadyRunningError as exc:
-        # 直接上拋，由 CLI 層轉成非零退出碼 + 友好訊息
-        raise
+    debug_log(f"starting daemon on {host}:{port} (pid={os.getpid()})")
 
-    debug_log(
-        f"PID lock acquired (pid={os.getpid()}, path={lock.path}); "
-        f"starting daemon on {host}:{port}"
+    app, _manager = build_daemon_app(host=host, port=port)
+
+    config = uvicorn.Config(
+        app=app,
+        host=host,
+        port=port,
+        log_level=log_level,
+        access_log=False,
+        ws="auto",
+        timeout_graceful_shutdown=2,
     )
-
-    try:
-        app, _manager = build_daemon_app(host=host, port=port)
-
-        config = uvicorn.Config(
-            app=app,
-            host=host,
-            port=port,
-            log_level=log_level,
-            access_log=False,
-            ws="auto",
-            timeout_graceful_shutdown=2,
-        )
-        server = uvicorn.Server(config)
-        server.run()
-    finally:
-        lock.release()
-        debug_log("daemon exited; PID lock released")
+    server = uvicorn.Server(config)
+    server.run()
+    debug_log("daemon exited")

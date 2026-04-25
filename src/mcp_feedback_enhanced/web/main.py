@@ -282,9 +282,14 @@ class WebUIManager:
         @self.app.middleware("http")
         async def compression_and_cache_middleware(request: Request, call_next):
             """壓縮和緩存中間件"""
+            # MCP Streamable HTTP 是長壽 SSE 流，跳過中間件以避免
+            # BaseHTTPMiddleware 在關停時的 CancelledError。
+            if request.url.path.startswith("/mcp"):
+                return await call_next(request)
+
             try:
                 response = await call_next(request)
-            except RuntimeError:
+            except (RuntimeError, asyncio.CancelledError):
                 from starlette.responses import Response as StarletteResponse
                 return StarletteResponse(status_code=500)
 

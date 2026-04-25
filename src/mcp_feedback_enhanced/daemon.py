@@ -52,7 +52,7 @@ __all__ = [
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("uvicorn.error")
 
 
 def _import_mcp_instance() -> Any:
@@ -212,7 +212,7 @@ def serve_http(
             log_level=log_level,
             access_log=False,
             ws="auto",
-            timeout_graceful_shutdown=0,
+            timeout_graceful_shutdown=2,
         )
         server = uvicorn.Server(config)
         server.run()

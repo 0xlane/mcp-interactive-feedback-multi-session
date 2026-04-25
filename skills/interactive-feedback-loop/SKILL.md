@@ -35,6 +35,14 @@ Arguments:
 4. **If feedback contains new requests or corrections** → address them, then call the tool again with an updated summary **and the same `feedback_session_id`**. This reuses the existing UI session instead of creating a new one.
 5. **If feedback is empty, or the user says things like "done", "no more", "looks good", "stop", "ok", "没问题", "可以了", "结束"** → end the loop. The task is complete.
 
+## When Creating Subagents via the Task Tool
+
+When you (the top-level agent) create a subagent using the `Task` tool, you **MUST** explicitly include the following instruction at the beginning or end of the `prompt` parameter:
+
+> **You are a subagent created by a parent agent via the Task tool. Do NOT call the `interactive_feedback` MCP tool. Complete your task and return your result directly — do not attempt to collect user feedback.**
+
+This is necessary because subagents inherit the parent agent's skills and rules (including this skill and the `interactive-feedback.mdc` rule), but they cannot automatically determine that they are subagents. Without this explicit instruction, a subagent may call `interactive_feedback`, causing the session to hang indefinitely and block the parent agent.
+
 ## Key Rules
 
 - **Always call the tool** — even if you believe the task is trivially done. The user decides when to stop, not you.

@@ -43,6 +43,11 @@ Daemon 启动后，FastMCP 将以 Streamable HTTP 传输挂在 `/mcp/`。Agent �
 | `title` | `string?` | `None` | 会话标题；强烈建议填写，侧栏/标题栏/快捷键都靠它识别 |
 | `feedback_session_id` | `string?` | `None` | 上一轮工具返回中的 session ID；传入后同一对话的多轮反馈复用同一个前端会话 |
 
+> **会话复用优先级**（v3.1.1+）：
+> 1. 若提供了 `feedback_session_id` 且该 session 存在、不在 `WAITING` / `ACTIVE` 状态 → 直接复用；
+> 2. 若未提供 `feedback_session_id`，但提供了 `title`，且后端存在 `title` 和 `project_directory` 都一致、且已脱离 `WAITING` / `ACTIVE` 状态的 session → 匹配最近一个并复用（兜底逻辑，防止 Agent 遗漏传递 `feedback_session_id`）；
+> 3. 以上均不满足 → 创建新 session。
+
 返回值：`list[TextContent | ImageContent]`，内容依次是：
 
 1. 一段可读的 summary 文本（包含用户提交的自由文本、操作日志）；
@@ -311,4 +316,4 @@ session 曾经绑过哪条 WS，用于兼容）。
 
 ---
 
-**文档版本**：v3.0.0-dev · **最后更新**：2026-04-22
+**文档版本**：v3.1.1-dev · **最后更新**：2026-04-25

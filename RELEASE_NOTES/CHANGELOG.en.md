@@ -9,6 +9,34 @@ and is not tracked here.
 
 ---
 
+## [v3.1.1] - 2026-04-25 - Smart Session Matching & Stability Fix
+
+### 🌟 Highlights
+A new fallback session matching mechanism based on `title` + `project_directory`
+ensures that even if an agent forgets to pass back the `feedback_session_id`,
+the server can still locate and reuse the matching session. Also fixes a
+middleware crash under concurrent HTTP/WebSocket traffic.
+
+### ✨ New Features
+- 🔍 **Match sessions by title + project path**: when `feedback_session_id` is
+  not provided but `title` is, the server searches for the most recent
+  completed/submitted session with the same `title` and `project_directory` and
+  reuses it — prevents extra sidebar cards when an agent omits the session ID
+
+### 🐛 Bug Fixes
+- 🛡️ **Compression middleware RuntimeError**: `call_next()` in
+  `compression_and_cache_middleware` could throw
+  `RuntimeError: No response returned` under concurrent HTTP + WebSocket
+  traffic (known Starlette 1.0.0 issue); now caught and falls back to an
+  HTTP 500 response instead of crashing the daemon
+
+### 📚 Documentation
+- 📝 **Agent Skill subagent identity**: `SKILL.md` now instructs the top-level
+  agent to explicitly mark subagent identity when creating subagents via the
+  Task tool, preventing subagents from calling `interactive_feedback`
+
+---
+
 ## [v3.1.0] - 2026-04-24 - Session Reuse & Agent Skill
 
 ### 🌟 Highlights

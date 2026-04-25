@@ -9,6 +9,32 @@
 
 ---
 
+## [v3.1.1] - 2026-04-25 - 會話智能匹配與穩定性修復
+
+### 🌟 版本亮點
+新增依 `title` + `project_directory` 的會話自動匹配機制，作為
+`feedback_session_id` 的兜底邏輯：即使 Agent 忘記傳回 session ID，
+服務端也能根據標題與專案路徑找到已有會話並復用。同時修復了中介軟體
+在並發 HTTP/WebSocket 場景下的崩潰問題。
+
+### ✨ 新功能
+- 🔍 **按標題 + 專案路徑匹配會話**：當 `feedback_session_id` 未提供時，
+  服務端會在現有已完成 / 已提交的會話中查找 `title` 和 `project_directory`
+  都一致的最近一個，自動復用——避免 Agent 遺漏 ID 時建立多餘卡片
+
+### 🐛 問題修復
+- 🛡️ **壓縮中介軟體 RuntimeError**：`compression_and_cache_middleware` 中
+  `call_next()` 在並發 HTTP + WebSocket 請求下可能拋出
+  `RuntimeError: No response returned`（Starlette 1.0.0 已知問題），
+  現在捕獲並回退到 HTTP 500 回應，不再造成 daemon 崩潰
+
+### 📚 文件
+- 📝 **Agent Skill 子代理身份提示**：`SKILL.md` 新增說明，要求頂層 Agent
+  在建立子代理（Task tool）時明確標注子代理身份，禁止子代理呼叫
+  `interactive_feedback`
+
+---
+
 ## [v3.1.0] - 2026-04-24 - 會話復用與 Agent Skill
 
 ### 🌟 版本亮點

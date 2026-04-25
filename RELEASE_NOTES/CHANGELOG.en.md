@@ -9,31 +9,39 @@ and is not tracked here.
 
 ---
 
-## [v3.1.1] - 2026-04-25 - Smart Session Matching & Stability Fix
+## [v3.1.1] - 2026-04-25 - Smart Session Matching, Draft Isolation & Stability
 
 ### 🌟 Highlights
-A new fallback session matching mechanism based on `title` + `project_directory`
-ensures that even if an agent forgets to pass back the `feedback_session_id`,
-the server can still locate and reuse the matching session. Also fixes a
-middleware crash under concurrent HTTP/WebSocket traffic.
+- Fallback session matching by `title` + `project_directory` when
+  `feedback_session_id` is omitted; WAITING/ACTIVE status restriction removed
+  so any session can be reused
+- Reusing a WAITING session appends the new AI summary (separated by `---`)
+  instead of replacing it, preserving the user's in-progress draft and images
+- Switching sessions now saves/restores images per session — no more cross-session
+  image leakage
 
 ### ✨ New Features
-- 🔍 **Match sessions by title + project path**: when `feedback_session_id` is
-  not provided but `title` is, the server searches for the most recent
-  completed/submitted session with the same `title` and `project_directory` and
-  reuses it — prevents extra sidebar cards when an agent omits the session ID
+- 🔍 **Match sessions by title + project path**: server finds and reuses the
+  most recent session with the same `title` and `project_directory`
+- 🔄 **Status-agnostic session reuse**: all session states are reusable; WAITING
+  sessions get summary appended with `---`, drafts and images preserved
+- 📊 **MCP connect/disconnect INFO logs**: daemon logs new client connections
+  and disconnections at INFO level
 
 ### 🐛 Bug Fixes
-- 🛡️ **Compression middleware RuntimeError**: `call_next()` in
-  `compression_and_cache_middleware` could throw
-  `RuntimeError: No response returned` under concurrent HTTP + WebSocket
-  traffic (known Starlette 1.0.0 issue); now caught and falls back to an
-  HTTP 500 response instead of crashing the daemon
+- 🛡️ **Compression middleware RuntimeError**: `call_next()` crash under
+  concurrent HTTP + WebSocket traffic now caught with HTTP 500 fallback
+- 🖼️ **Per-session image drafts**: switching sessions no longer shares images;
+  each session independently saves/restores its draft images
+- 📐 **Session details modal z-index**: raised from 2000 to 2200 so it renders
+  above the session history modal
+- 🔇 **Audio autoplay false positive**: page refresh no longer shows the
+  "browser blocked autoplay" notification — only shown if autoplay fails after
+  the user has already interacted with the page
 
 ### 📚 Documentation
-- 📝 **Agent Skill subagent identity**: `SKILL.md` now instructs the top-level
-  agent to explicitly mark subagent identity when creating subagents via the
-  Task tool, preventing subagents from calling `interactive_feedback`
+- 📝 **Agent Skill subagent identity**: `SKILL.md` updated
+- 📖 **API reference session reuse priority**: three-tier reuse logic documented
 
 ---
 

@@ -1332,15 +1332,21 @@
                 }
             }
 
-            // session 復用（reused=true 且 status=waiting）：清空表單，準備新一輪回饋
+            // session 復用（reused=true 且 status=waiting）
             if (data.reused && data.session_info && data.session_info.status === 'waiting') {
-                console.log('🔁 session 被復用，清空回饋表單');
-                if (this._drafts) {
-                    delete this._drafts[newSessionId];
-                }
-                this.uiManager.resetFeedbackForm(true);
-                if (this.imageHandler) {
-                    this.imageHandler.clearImages();
+                if (data.summary_appended) {
+                    // 摘要追加模式：僅更新 AI 摘要，保留用戶草稿和圖片
+                    console.log('🔁 session 被復用（摘要追加），保留用戶輸入');
+                } else {
+                    // 常規復用：清空表單，準備新一輪回饋
+                    console.log('🔁 session 被復用，清空回饋表單');
+                    if (this._drafts) {
+                        delete this._drafts[newSessionId];
+                    }
+                    this.uiManager.resetFeedbackForm(true);
+                    if (this.imageHandler) {
+                        this.imageHandler.clearImages();
+                    }
                 }
                 this.uiManager.setFeedbackState(window.MCPFeedback.Utils.CONSTANTS.FEEDBACK_WAITING, newSessionId);
                 if (data.session_info.summary) {

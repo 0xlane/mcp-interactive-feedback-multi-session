@@ -362,23 +362,35 @@ class WebFeedbackSession:
             SessionStatus.FEEDBACK_SUBMITTED,
         ]
 
-    def reset_for_reuse(self, new_summary: str, new_title: str | None = None) -> None:
+    def reset_for_reuse(self, new_summary: str, new_title: str | None = None) -> bool:
         """重置此 session 供同一對話的下一輪 MCP 調用復用。
 
-        前提：session 目前處於終態（FEEDBACK_SUBMITTED / COMPLETED / TIMEOUT）。
-        呼叫後 ``wait_for_feedback`` 可再次阻塞等待新一輪用戶回饋。
+        不限制調用時的 session 狀態；呼叫後 ``wait_for_feedback``
+        可再次阻塞等待新一輪用戶回饋。
+
+        若 session 處於 WAITING 狀態（前一輪尚未收到回饋），新摘要會
+        以分隔線追加到現有摘要之後，且保留用戶已輸入的草稿 / 圖片。
+
+        Returns:
+            ``True`` 表示復用前 session 已經是 WAITING（摘要追加模式）。
         """
-        self.summary = new_summary
+        was_waiting = self.status == SessionStatus.WAITING
+        if was_waiting and self.summary:
+            self.summary = f"{self.summary}\n\n---\n\n{new_summary}"
+        else:
+            self.summary = new_summary
         if new_title is not None:
             self.title = new_title
         self.status = SessionStatus.WAITING
         self.status_message = "等待用戶回饋"
         self.feedback_completed.clear()
         self.feedback_result = None
-        self.images = []
-        self.settings = {}
+        if not was_waiting:
+            self.images = []
+            self.settings = {}
         self.last_activity = time.time()
-        debug_log(f"會話 {self.session_id} 已重置供復用（新摘要長度={len(new_summary)}）")
+        debug_log(f"會話 {self.session_id} 已重置供復用（was_waiting={was_waiting}, 新摘要長度={len(self.summary)}）")
+        return was_waiting
 
     def _liveness_time(self) -> float:
         """取「會話最後一次還活著」的時間戳（秒）。

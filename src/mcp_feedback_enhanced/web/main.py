@@ -1396,25 +1396,21 @@ async def launch_web_feedback_ui(
 
     # ---- session 復用判斷 ----
     reused = False
+    was_waiting = False
     session = None
 
     if feedback_session_id:
         existing = manager.get_session(feedback_session_id)
-        if existing and existing.status not in (
-            SessionStatus.WAITING, SessionStatus.ACTIVE,
-        ):
+        if existing:
             debug_log(
                 f"復用 session {feedback_session_id}（上一輪狀態={existing.status.value}）"
             )
-            existing.reset_for_reuse(summary, title)
+            was_waiting = existing.reset_for_reuse(summary, title)
             session = existing
             reused = True
         else:
-            reason = (
-                f"狀態={existing.status.value}" if existing else "不存在"
-            )
             debug_log(
-                f"無法復用 session {feedback_session_id}（{reason}），將建立新 session"
+                f"無法復用 session {feedback_session_id}（不存在），將建立新 session"
             )
 
     # ---- 按 title + project_directory 匹配已有 session ----
@@ -1423,12 +1419,11 @@ async def launch_web_feedback_ui(
             if (
                 s.title == title
                 and s.project_directory == project_directory
-                and s.status not in (SessionStatus.WAITING, SessionStatus.ACTIVE)
             ):
                 debug_log(
                     f"按 title+project_directory 匹配到 session {s.session_id}"
                 )
-                s.reset_for_reuse(summary, title)
+                was_waiting = s.reset_for_reuse(summary, title)
                 session = s
                 reused = True
                 break
@@ -1460,6 +1455,7 @@ async def launch_web_feedback_ui(
                         "last_activity": int(session.last_activity * 1000),
                     },
                     "reused": True,
+                    "summary_appended": was_waiting,
                 }
             )
         except Exception as e:  # noqa: BLE001

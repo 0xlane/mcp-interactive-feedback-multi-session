@@ -140,9 +140,6 @@ def build_daemon_app(
                 _logger.info("[MCP] client disconnected (session=%s)", session_hdr)
                 _known_mcp_sessions.discard(session_hdr)
 
-            # 攔截響應 header 以偵測新 session 建立
-            captured_session_id: list[str] = []
-
             async def send_wrapper(message: dict) -> None:
                 if message.get("type") == "http.response.start":
                     headers = dict(
@@ -152,15 +149,11 @@ def build_daemon_app(
                     )
                     resp_sid = headers.get("mcp-session-id")
                     if resp_sid and resp_sid not in _known_mcp_sessions:
-                        captured_session_id.append(resp_sid)
+                        _known_mcp_sessions.add(resp_sid)
+                        _logger.info("[MCP] new client connected (session=%s)", resp_sid)
                 await send(message)
 
             await original_mcp_app(scope, receive, send_wrapper)
-
-            if captured_session_id:
-                sid = captured_session_id[0]
-                _known_mcp_sessions.add(sid)
-                _logger.info("[MCP] new client connected (session=%s)", sid)
             return
 
         await original_mcp_app(scope, receive, send)

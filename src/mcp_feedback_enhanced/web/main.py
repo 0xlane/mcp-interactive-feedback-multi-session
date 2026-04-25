@@ -38,6 +38,60 @@ from .utils.compression_config import get_compression_manager
 from .utils.port_manager import PortManager
 
 
+class _CacheStatsMiddleware:
+    """Pure-ASGI middleware for cache headers and compression stats.
+
+    Unlike ``@app.middleware("http")`` (which wraps in ``BaseHTTPMiddleware``
+    and creates an ``anyio.TaskGroup`` per request), this middleware operates
+    at the raw ASGI level and short-circuits ``/mcp`` paths completely,
+    preventing ``CancelledError`` on shutdown for long-lived SSE streams.
+    """
+
+    def __init__(self, app: Any, *, cache_config: Any, compression_manager: Any) -> None:
+        self.app = app
+        self.cache_config = cache_config
+        self.compression_manager = compression_manager
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or scope.get("path", "").startswith("/mcp"):
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
+        cfg = self.cache_config
+        cmgr = self.compression_manager
+
+        async def send_wrapper(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                raw_headers: list = list(message.get("headers", []))
+
+                if not cfg.should_exclude_path(path):
+                    for k, v in cfg.get_cache_headers(path).items():
+                        raw_headers.append((k.lower().encode(), v.encode()))
+
+                cl_val = 0
+                ce_val = ""
+                for hname, hval in raw_headers:
+                    name = hname.decode() if isinstance(hname, bytes) else hname
+                    val = hval.decode() if isinstance(hval, bytes) else hval
+                    if name == "content-length":
+                        try:
+                            cl_val = int(val)
+                        except (ValueError, TypeError):
+                            pass
+                    elif name == "content-encoding":
+                        ce_val = val
+                if cl_val > 0:
+                    compressed = "gzip" in ce_val
+                    orig = cl_val if not compressed else int(cl_val / 0.7)
+                    cmgr.update_stats(orig, cl_val, compressed)
+
+                message = dict(message, headers=raw_headers)
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 class WebUIManager:
     """Web UI 管理器 - 多會話模式（階段 1：後端多會話化，前端暫保持單活躍視圖）
 
@@ -270,54 +324,22 @@ class WebUIManager:
             await loop.run_in_executor(executor, preload_i18n)
 
     def _setup_compression_middleware(self):
-        """設置壓縮和緩存中間件"""
-        # 獲取壓縮管理器
+        """設置壓縮和緩存中間件
+
+        使用純 ASGI 中間件取代 ``@app.middleware("http")``（即 ``BaseHTTPMiddleware``），
+        以避免 ``BaseHTTPMiddleware`` 為每個 HTTP 請求建立的 ``anyio.TaskGroup``
+        在長壽 SSE 流（如 MCP Streamable HTTP）進行中遇到 Ctrl-C 關停時拋出
+        ``CancelledError``。
+        """
         compression_manager = get_compression_manager()
         config = compression_manager.config
 
-        # 添加 Gzip 壓縮中間件
         self.app.add_middleware(GZipMiddleware, minimum_size=config.minimum_size)
-
-        # 添加緩存和壓縮統計中間件
-        @self.app.middleware("http")
-        async def compression_and_cache_middleware(request: Request, call_next):
-            """壓縮和緩存中間件"""
-            # MCP Streamable HTTP 是長壽 SSE 流，跳過中間件以避免
-            # BaseHTTPMiddleware 在關停時的 CancelledError。
-            if request.url.path.startswith("/mcp"):
-                return await call_next(request)
-
-            try:
-                response = await call_next(request)
-            except (RuntimeError, asyncio.CancelledError):
-                from starlette.responses import Response as StarletteResponse
-                return StarletteResponse(status_code=500)
-
-            # 添加緩存頭
-            if not config.should_exclude_path(request.url.path):
-                cache_headers = config.get_cache_headers(request.url.path)
-                for key, value in cache_headers.items():
-                    response.headers[key] = value
-
-            # 更新壓縮統計（如果可能）
-            try:
-                content_length = int(response.headers.get("content-length", 0))
-                content_encoding = response.headers.get("content-encoding", "")
-                was_compressed = "gzip" in content_encoding
-
-                if content_length > 0:
-                    original_size = (
-                        content_length
-                        if not was_compressed
-                        else int(content_length / 0.7)
-                    )
-                    compression_manager.update_stats(
-                        original_size, content_length, was_compressed
-                    )
-            except (ValueError, TypeError):
-                pass
-
-            return response
+        self.app.add_middleware(
+            _CacheStatsMiddleware,
+            cache_config=config,
+            compression_manager=compression_manager,
+        )
 
         debug_log("壓縮和緩存中間件設置完成")
 

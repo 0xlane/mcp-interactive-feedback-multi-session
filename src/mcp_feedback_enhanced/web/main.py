@@ -1417,6 +1417,22 @@ async def launch_web_feedback_ui(
                 f"無法復用 session {feedback_session_id}（{reason}），將建立新 session"
             )
 
+    # ---- 按 title + project_directory 匹配已有 session ----
+    if session is None and title:
+        for s in reversed(list(manager.sessions.values())):
+            if (
+                s.title == title
+                and s.project_directory == project_directory
+                and s.status not in (SessionStatus.WAITING, SessionStatus.ACTIVE)
+            ):
+                debug_log(
+                    f"按 title+project_directory 匹配到 session {s.session_id}"
+                )
+                s.reset_for_reuse(summary, title)
+                session = s
+                reused = True
+                break
+
     if session is None:
         session_id = manager.create_session(project_directory, summary, title=title)
         session = manager.get_session(session_id)

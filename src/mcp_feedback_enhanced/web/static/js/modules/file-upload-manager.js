@@ -514,6 +514,14 @@
     };
 
     /**
+     * 用已處理好的 fileData 陣列直接替換（用於會話切換時還原草稿圖片）
+     */
+    FileUploadManager.prototype.setFiles = function(fileDataArray) {
+        this.files = (fileDataArray || []).slice();
+        this.updateAllPreviews();
+    };
+
+    /**
      * 清空所有檔案
      */
     FileUploadManager.prototype.clearFiles = function() {

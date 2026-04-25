@@ -510,8 +510,13 @@
 
         const ta = document.querySelector('#combinedFeedbackText');
 
-        if (this._lastActiveSessionId && this._lastActiveSessionId !== sessionId && ta) {
-            this._drafts[this._lastActiveSessionId] = ta.value || '';
+        // 離開舊會話：保存文字草稿 + 圖片
+        if (this._lastActiveSessionId && this._lastActiveSessionId !== sessionId) {
+            var draft = { text: (ta ? ta.value : '') || '' };
+            if (this.imageHandler) {
+                draft.images = this.imageHandler.getImages();
+            }
+            this._drafts[this._lastActiveSessionId] = draft;
         }
 
         if (!sessionId) {
@@ -537,9 +542,14 @@
         const commandOutput = document.querySelector('#commandOutput');
         if (commandOutput) commandOutput.textContent = '';
 
+        // 還原目標會話的草稿（文字 + 圖片）
+        var saved = this._drafts[sessionId];
         if (ta) {
-            ta.value = this._drafts[sessionId] || '';
+            ta.value = (saved && saved.text != null) ? saved.text : (typeof saved === 'string' ? saved : '');
             try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+        }
+        if (this.imageHandler) {
+            this.imageHandler.setImages((saved && saved.images) ? saved.images : []);
         }
 
         this._syncFeedbackStateToSession(rec);

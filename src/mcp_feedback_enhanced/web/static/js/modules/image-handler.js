@@ -141,6 +141,13 @@
     };
 
     /**
+     * 用已處理好的 fileData 陣列直接還原（會話切換時恢復草稿圖片）
+     */
+    ImageHandler.prototype.setImages = function(fileDataArray) {
+        this.fileUploadManager.setFiles(fileDataArray);
+    };
+
+    /**
      * 清空所有圖片
      */
     ImageHandler.prototype.clearImages = function() {

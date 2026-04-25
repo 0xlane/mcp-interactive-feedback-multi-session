@@ -1407,20 +1407,6 @@
                     window.MCPFeedback.app = window.feedbackApp;
                 }
 
-                // 初始化完成後，立即渲染現有的 AI 摘要內容為 Markdown
-                setTimeout(function() {
-                    if (window.feedbackApp && window.feedbackApp.uiManager) {
-                        // 獲取當前的摘要內容
-                        const summaryElement = document.querySelector('#combinedSummaryContent');
-                        const summaryTabElement = document.querySelector('#summaryContent');
-
-                        if (summaryElement && summaryElement.textContent) {
-                            console.log('🔧 初始化時渲染 Markdown 內容...');
-                            window.feedbackApp.uiManager.updateAISummaryContent(summaryElement.textContent);
-                        }
-                    }
-                }, 100);
-
                 logger.info('應用程式初始化完成');
             } catch (error) {
                 const logger = window.MCPFeedback?.logger || console;

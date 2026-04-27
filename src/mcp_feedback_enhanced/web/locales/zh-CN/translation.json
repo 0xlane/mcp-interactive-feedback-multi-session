@@ -297,6 +297,9 @@
         "createdTime": "建立时间",
         "project": "项目",
         "aiSummary": "AI 总结",
+        "conversationTimeline": "反馈记录",
+        "userLabel": "用户",
+        "timelineSummary": "共 {total} 条记录（AI {ai} / 用户 {user}）",
         "noSummary": "无总结",
         "loading": "加载中...",
         "collapsePanel": "收合面板",
@@ -311,7 +314,8 @@
             "noSummary": "暂无总结",
             "unknown": "未知",
             "inProgress": "进行中",
-            "inProgressSuffix": "(进行中)"
+            "inProgressSuffix": "(进行中)",
+            "copyAll": "复制全部"
         },
         "copySessionContent": "复制会话内容",
         "copyUserContent": "复制用户内容",

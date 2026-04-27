@@ -736,6 +736,7 @@ class WebUIManager:
                     "feedback_completed": session.feedback_completed.is_set(),
                     "is_current": session_id == self._active_session_id,
                     "user_messages": session.user_messages,
+                    "ai_summaries": session.ai_summaries,
                     "_seq": self._session_creation_order.get(session_id, 0),
                 }
             )
@@ -1480,6 +1481,7 @@ async def launch_web_feedback_ui(
                         "status_message": session.status_message,
                         "created_at": int(session.created_at * 1000),
                         "last_activity": int(session.last_activity * 1000),
+                        "ai_summaries": session.ai_summaries,
                     },
                     "reused": True,
                     "summary_appended": was_waiting,
@@ -1504,6 +1506,7 @@ async def launch_web_feedback_ui(
                         "feedback_completed": False,
                         "is_current": True,
                         "user_messages": [],
+                        "ai_summaries": session.ai_summaries,
                     },
                 }
             )

@@ -861,33 +861,47 @@
      * 格式化当前会话内容
      */
     SessionManager.prototype.formatCurrentSessionContent = function(sessionData) {
+        const TimeUtils = window.MCPFeedback.Utils.Time;
         const lines = [];
         lines.push('# MCP Feedback Enhanced - 当前会话内容');
         lines.push('');
         lines.push(`**会话ID**: ${sessionData.session_id || 'N/A'}`);
         lines.push(`**项目目录**: ${sessionData.project_directory || 'N/A'}`);
-        lines.push(`**摘要**: ${sessionData.summary || 'N/A'}`);
         lines.push(`**状态**: ${sessionData.status || 'N/A'}`);
         lines.push(`**创建时间**: ${sessionData.created_at || 'N/A'}`);
         lines.push(`**更新时间**: ${sessionData.updated_at || 'N/A'}`);
         lines.push('');
 
-        if (sessionData.user_messages && sessionData.user_messages.length > 0) {
-            lines.push('## 用户消息');
-            sessionData.user_messages.forEach((msg, index) => {
-                lines.push(`### 消息 ${index + 1}`);
-                lines.push(msg);
-                lines.push('');
-            });
-        }
+        const aiSummaries = sessionData.ai_summaries || [];
+        const userMessages = sessionData.user_messages || [];
 
-        if (sessionData.ai_responses && sessionData.ai_responses.length > 0) {
-            lines.push('## AI 响应');
-            sessionData.ai_responses.forEach((response, index) => {
-                lines.push(`### 响应 ${index + 1}`);
-                lines.push(response);
+        if (aiSummaries.length > 1 || userMessages.length > 0) {
+            lines.push('## 反馈记录');
+            lines.push('');
+
+            var timeline = [];
+            aiSummaries.forEach(function(item) {
+                timeline.push({ type: 'ai', timestamp: (item.timestamp || 0) * 1000, content: item.summary || '' });
+            });
+            userMessages.forEach(function(msg) {
+                timeline.push({ type: 'user', timestamp: msg.timestamp || 0, content: msg.content || '' });
+            });
+            timeline.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+            timeline.forEach(function(entry) {
+                const ts = entry.timestamp ? TimeUtils.formatTimestamp(entry.timestamp) : '';
+                const userLabel = window.i18nManager ? window.i18nManager.t('sessionManagement.userLabel') : '用户';
+                const role = entry.type === 'ai' ? 'AI' : userLabel;
+                lines.push(`### ${role}${ts ? ' (' + ts + ')' : ''}`);
+                lines.push('');
+                lines.push(entry.content);
+                lines.push('');
+                lines.push('---');
                 lines.push('');
             });
+        } else {
+            lines.push(`**摘要**: ${sessionData.summary || 'N/A'}`);
+            lines.push('');
         }
 
         return lines.join('\n');

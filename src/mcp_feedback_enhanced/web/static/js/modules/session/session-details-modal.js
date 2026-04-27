@@ -86,6 +86,23 @@
         } else if (sessionData.created_at && sessionData.completed_at) {
             const durationSeconds = sessionData.completed_at - sessionData.created_at;
             duration = TimeUtils.formatDuration(durationSeconds);
+        } else if (sessionData.created_at && sessionData.last_activity) {
+            var terminalStatuses = ['completed', 'timeout', 'error', 'expired', 'closed'];
+            var isTerminal = terminalStatuses.indexOf(sessionData.status) !== -1;
+            if (isTerminal) {
+                var normalize = function(ts) { return ts > 1e12 ? ts / 1000 : ts; };
+                var created = normalize(sessionData.created_at);
+                var lastAct = normalize(sessionData.last_activity);
+                var diff = lastAct - created;
+                if (diff > 0) {
+                    duration = TimeUtils.formatDuration(diff);
+                }
+            } else {
+                var elapsed = TimeUtils.calculateElapsedTime(sessionData.created_at);
+                if (elapsed > 0) {
+                    duration = TimeUtils.formatDuration(elapsed) + ' ' + inProgressSuffixText;
+                }
+            }
         } else if (sessionData.created_at) {
             const elapsed = TimeUtils.calculateElapsedTime(sessionData.created_at);
             if (elapsed > 0) {
@@ -102,6 +119,8 @@
         const userMessages = sessionData.user_messages || [];
         const userMessageCount = userMessages.length;
 
+        const aiSummaries = sessionData.ai_summaries || [];
+
         return {
             sessionId: sessionId,
             status: statusText,
@@ -110,6 +129,7 @@
             duration: duration,
             projectDirectory: sessionData.project_directory || (window.i18nManager ? window.i18nManager.t('sessionManagement.sessionDetails.unknown') : '未知'),
             summary: sessionData.summary || (window.i18nManager ? window.i18nManager.t('sessionManagement.sessionDetails.noSummary') : '暫無摘要'),
+            aiSummaries: aiSummaries,
             userMessages: userMessages,
             userMessageCount: userMessageCount
         };
@@ -174,16 +194,7 @@
                             <span class="detail-label">${i18n ? i18n.t('sessionManagement.sessionDetails.projectDirectory') : '專案目錄'}:</span>
                             <span class="detail-value project-path" title="${details.projectDirectory}">${details.projectDirectory}</span>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">${i18n ? i18n.t('sessionManagement.aiSummary') : 'AI 摘要'}:</span>
-                            <div class="detail-value summary">
-                                <div class="summary-actions">
-                                    <button class="btn-copy-summary" title="複製摘要" aria-label="複製摘要">📋</button>
-                                </div>
-                                <div class="summary-content">${this.renderMarkdownSafely(details.summary)}</div>
-                            </div>
-                        </div>
-                        ${this.createUserMessagesSection(details)}
+                        ${this.createConversationTimeline(details)}
                     </div>
                     <div class="modal-footer">
                         <button class="btn-secondary" id="closeSessionDetailsBtn">${closeLabel}</button>
@@ -194,89 +205,116 @@
     };
 
     /**
-     * 創建用戶訊息記錄區段
+     * 創建對話時間線（AI 摘要 + 用戶訊息按時間排序合併）
      */
-    SessionDetailsModal.prototype.createUserMessagesSection = function(details) {
+    SessionDetailsModal.prototype.createConversationTimeline = function(details) {
         const i18n = window.i18nManager;
+        const aiSummaries = details.aiSummaries || [];
         const userMessages = details.userMessages || [];
 
-        if (userMessages.length === 0) {
-            return '';
+        if (aiSummaries.length <= 1 && userMessages.length === 0) {
+            const sectionLabel = i18n ? i18n.t('sessionManagement.aiSummary') : 'AI 摘要';
+            return `
+                <div class="detail-row">
+                    <span class="detail-label">${sectionLabel}:</span>
+                    <div class="detail-value summary">
+                        <div class="summary-actions">
+                            <button class="btn-copy-summary" title="複製摘要" aria-label="複製摘要">📋</button>
+                        </div>
+                        <div class="summary-content">${this.renderMarkdownSafely(details.summary)}</div>
+                    </div>
+                </div>
+            `;
         }
 
-        const sectionTitle = i18n ? i18n.t('sessionHistory.userMessages.title') : '用戶訊息記錄';
-        const messageCountLabel = i18n ? i18n.t('sessionHistory.userMessages.messageCount') : '訊息數量';
+        var timeline = [];
 
-        let messagesHtml = '';
+        aiSummaries.forEach(function(item) {
+            timeline.push({
+                type: 'ai',
+                timestamp: (item.timestamp || 0) * 1000,
+                content: item.summary || ''
+            });
+        });
 
-        userMessages.forEach((message, index) => {
-            const timestamp = message.timestamp ? TimeUtils.formatTimestamp(message.timestamp) : '未知時間';
-            const submissionMethod = message.submission_method === 'auto' ?
-                (i18n ? i18n.t('sessionHistory.userMessages.auto') : '自動提交') :
-                (i18n ? i18n.t('sessionHistory.userMessages.manual') : '手動提交');
+        userMessages.forEach(function(msg) {
+            timeline.push({
+                type: 'user',
+                timestamp: msg.timestamp || 0,
+                content: msg.content,
+                contentLength: msg.content_length,
+                imageCount: msg.image_count || (msg.images ? msg.images.length : 0),
+                images: msg.images,
+                submissionMethod: msg.submission_method,
+                privacyNote: msg.privacy_note
+            });
+        });
 
-            let contentHtml = '';
+        timeline.sort(function(a, b) { return a.timestamp - b.timestamp; });
 
-            if (message.content !== undefined) {
-                // 完整記錄模式
-                const contentPreview = message.content.length > 100 ?
-                    message.content.substring(0, 100) + '...' :
-                    message.content;
-                contentHtml = `
-                    <div class="message-content">
-                        <strong>內容:</strong> ${this.escapeHtml(contentPreview)}
-                    </div>
-                `;
-
-                if (message.images && message.images.length > 0) {
-                    const imageCountText = i18n ? i18n.t('sessionHistory.userMessages.imageCount') : '圖片數量';
-                    contentHtml += `
-                        <div class="message-images">
-                            <strong>${imageCountText}:</strong> ${message.images.length}
+        const self = this;
+        let timelineHtml = '';
+        timeline.forEach(function(entry, index) {
+            const ts = entry.timestamp ? TimeUtils.formatTimestamp(entry.timestamp) : '';
+            if (entry.type === 'ai') {
+                const roleLabel = 'AI';
+                timelineHtml += `
+                    <div class="timeline-item timeline-ai" data-index="${index}">
+                        <div class="message-header">
+                            <span class="timeline-role timeline-role-ai">${roleLabel}</span>
+                            <span class="message-time">${ts}</span>
+                            <button class="btn-copy-message" title="複製" aria-label="複製" data-message-content="${self.escapeHtml(entry.content)}">📋</button>
                         </div>
-                    `;
-                }
-            } else if (message.content_length !== undefined) {
-                // 基本統計模式
-                const contentLengthLabel = i18n ? i18n.t('sessionHistory.userMessages.contentLength') : '內容長度';
-                const imageCountLabel = i18n ? i18n.t('sessionHistory.userMessages.imageCount') : '圖片數量';
-                contentHtml = `
-                    <div class="message-stats">
-                        <strong>${contentLengthLabel}:</strong> ${message.content_length} 字元<br>
-                        <strong>${imageCountLabel}:</strong> ${message.image_count || 0}
+                        <div class="summary-content">${self.renderMarkdownSafely(entry.content)}</div>
                     </div>
                 `;
-            } else if (message.privacy_note) {
-                // 隱私保護模式
-                contentHtml = `
-                    <div class="message-privacy">
-                        <em style="color: var(--text-secondary);">內容記錄已停用（隱私設定）</em>
+            } else {
+                const roleLabel = i18n ? i18n.t('sessionManagement.userLabel') : '用户';
+                const methodLabel = entry.submissionMethod === 'auto'
+                    ? (i18n ? i18n.t('sessionHistory.userMessages.auto') : '自動提交')
+                    : (i18n ? i18n.t('sessionHistory.userMessages.manual') : '手動提交');
+
+                let contentHtml = '';
+                if (entry.content !== undefined && entry.content !== null) {
+                    contentHtml = `<div class="message-content">${self.escapeHtml(entry.content)}</div>`;
+                    if (entry.imageCount > 0) {
+                        contentHtml += `<div class="message-images"><em>${entry.imageCount} 張圖片</em></div>`;
+                    }
+                } else if (entry.contentLength !== undefined) {
+                    contentHtml = `<div class="message-stats">${entry.contentLength} 字元${entry.imageCount ? '，' + entry.imageCount + ' 張圖片' : ''}</div>`;
+                } else if (entry.privacyNote) {
+                    contentHtml = `<div class="message-privacy"><em style="color: var(--text-secondary);">內容記錄已停用（隱私設定）</em></div>`;
+                }
+
+                timelineHtml += `
+                    <div class="timeline-item timeline-user" data-index="${index}">
+                        <div class="message-header">
+                            <span class="timeline-role timeline-role-user">${roleLabel}</span>
+                            <span class="message-time">${ts}</span>
+                            <span class="message-method">${methodLabel}</span>
+                            ${entry.content !== undefined && entry.content !== null ? '<button class="btn-copy-message" title="複製" aria-label="複製" data-message-content="' + self.escapeHtml(entry.content) + '">📋</button>' : ''}
+                        </div>
+                        ${contentHtml}
                     </div>
                 `;
             }
-
-            messagesHtml += `
-                <div class="user-message-item" data-message-index="${index}">
-                    <div class="message-header">
-                        <span class="message-index">#${index + 1}</span>
-                        <span class="message-time">${timestamp}</span>
-                        <span class="message-method">${submissionMethod}</span>
-                        <button class="btn-copy-message" title="複製消息內容" aria-label="複製消息內容" data-message-content="${this.escapeHtml(message.content)}">📋</button>
-                    </div>
-                    ${contentHtml}
-                </div>
-            `;
         });
 
+        const sectionTitle = i18n ? i18n.t('sessionManagement.conversationTimeline') : '反馈记录';
+        const totalCount = timeline.length;
+
         return `
-            <div class="detail-row user-messages-section">
+            <div class="detail-row conversation-timeline-section">
                 <span class="detail-label">${sectionTitle}:</span>
                 <div class="detail-value">
-                    <div class="user-messages-summary">
-                        <strong>${messageCountLabel}:</strong> ${userMessages.length}
+                    <div class="summary-actions">
+                        <button class="btn-copy-summary" title="${i18n ? i18n.t('sessionManagement.sessionDetails.copyAll') || '复制全部' : '复制全部'}" aria-label="复制全部">📋 ${i18n ? i18n.t('sessionManagement.sessionDetails.copyAll') || '复制全部' : '复制全部'}</button>
                     </div>
-                    <div class="user-messages-list">
-                        ${messagesHtml}
+                    <div class="user-messages-summary">
+                        <strong>${i18n ? i18n.t('sessionManagement.timelineSummary', { total: totalCount, ai: aiSummaries.length, user: userMessages.length }) : '共 ' + totalCount + ' 条记录（AI ' + aiSummaries.length + ' / 用户 ' + userMessages.length + '）'}</strong>
+                    </div>
+                    <div class="conversation-timeline">
+                        ${timelineHtml}
                     </div>
                 </div>
             </div>
@@ -463,12 +501,39 @@
         const self = this;
 
         try {
-            // 獲取原始摘要內容（Markdown 原始碼）
-            const summaryContent = this.currentSessionData && this.currentSessionData.summary ?
-                this.currentSessionData.summary : '';
+            const sd = this.currentSessionData;
+            if (!sd) {
+                console.warn('⚠️ 沒有會話數據可複製');
+                return;
+            }
+
+            const aiSummaries = sd.ai_summaries || [];
+            const userMessages = sd.user_messages || [];
+            let summaryContent = '';
+
+            if (aiSummaries.length > 1 || userMessages.length > 0) {
+                var timeline = [];
+                aiSummaries.forEach(function(item) {
+                    timeline.push({ type: 'ai', timestamp: (item.timestamp || 0) * 1000, content: item.summary || '' });
+                });
+                userMessages.forEach(function(msg) {
+                    timeline.push({ type: 'user', timestamp: msg.timestamp || 0, content: msg.content || '' });
+                });
+                timeline.sort(function(a, b) { return a.timestamp - b.timestamp; });
+
+                var i18n = window.i18nManager;
+                var userLabel = i18n ? i18n.t('sessionManagement.userLabel') : '用户';
+                summaryContent = timeline.map(function(entry) {
+                    const ts = entry.timestamp ? TimeUtils.formatTimestamp(entry.timestamp) : '';
+                    const role = entry.type === 'ai' ? 'AI' : userLabel;
+                    return '### ' + role + (ts ? ' (' + ts + ')' : '') + '\n\n' + entry.content;
+                }).join('\n\n---\n\n');
+            } else {
+                summaryContent = sd.summary || '';
+            }
 
             if (!summaryContent) {
-                console.warn('⚠️ 沒有摘要內容可複製');
+                console.warn('⚠️ 沒有內容可複製');
                 return;
             }
 

@@ -1351,6 +1351,68 @@
   color: var(--text-secondary);
 }
 
+/* 對話時間線樣式 */
+.conversation-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-item {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background var(--transition-fast) ease;
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-item:hover {
+  background: var(--bg-secondary);
+}
+
+.timeline-ai {
+  border-left: 3px solid var(--accent-color, #007acc);
+}
+
+.timeline-user {
+  border-left: 3px solid var(--success-color, #4caf50);
+}
+
+.timeline-role {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.timeline-role-ai {
+  background: rgba(0, 122, 204, 0.15);
+  color: var(--accent-color, #007acc);
+  border: 1px solid var(--accent-color, #007acc);
+}
+
+.timeline-role-user {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success-color, #4caf50);
+  border: 1px solid var(--success-color, #4caf50);
+}
+
+.timeline-item .summary-content {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.timeline-item .message-content {
+  border-left: none;
+  background: none;
+  padding: 0;
+  margin-top: 8px;
+}
+
 /* 隱私等級選擇器樣式增強 */
 #userMessagePrivacyLevel {
   background: var(--bg-secondary);

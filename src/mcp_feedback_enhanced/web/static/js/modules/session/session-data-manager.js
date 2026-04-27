@@ -933,10 +933,10 @@
                     status: session.status,
                     project_directory: session.project_directory,
                     ai_summary: session.summary || session.ai_summary,
+                    ai_summaries: session.ai_summaries || [],
                     saved_at: session.saved_at
                 };
 
-                // 包含用戶訊息記錄（如果存在且允許匯出）
                 if (session.user_messages && self.isUserMessageRecordingEnabled()) {
                     sessionData.user_messages = session.user_messages;
                     sessionData.user_message_count = session.user_messages.length;
@@ -974,10 +974,10 @@
             status: session.status,
             project_directory: session.project_directory,
             ai_summary: session.summary || session.ai_summary,
+            ai_summaries: session.ai_summaries || [],
             saved_at: session.saved_at
         };
 
-        // 包含用戶訊息記錄（如果存在且允許匯出）
         if (session.user_messages && this.isUserMessageRecordingEnabled()) {
             sessionData.user_messages = session.user_messages;
             sessionData.user_message_count = session.user_messages.length;

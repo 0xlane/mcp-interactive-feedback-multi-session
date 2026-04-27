@@ -142,6 +142,7 @@ class WebFeedbackSession:
         self.process: subprocess.Popen | None = None
         self.command_logs: list[str] = []
         self.user_messages: list[dict] = []  # 用戶消息記錄
+        self.ai_summaries: list[dict] = []  # AI 摘要歷史記錄
         self._cleanup_done = False  # 防止重複清理
         # 移除語言設定，改由前端處理
 
@@ -150,6 +151,8 @@ class WebFeedbackSession:
         self.status_message = "等待用戶回饋"
         # 統一使用 time.time() 以避免時間基準不一致
         self.created_at = time.time()
+        if summary:
+            self.ai_summaries.append({"summary": summary, "timestamp": self.created_at})
         self.last_activity = self.created_at
         self.last_heartbeat = None  # 記錄最後一次心跳時間
 
@@ -379,6 +382,8 @@ class WebFeedbackSession:
             self.summary = f"{self.summary}\n\n---\n\n{new_summary}"
         else:
             self.summary = new_summary
+        if new_summary:
+            self.ai_summaries.append({"summary": new_summary, "timestamp": time.time()})
         if new_title is not None:
             self.title = new_title
         self.status = SessionStatus.WAITING

@@ -302,6 +302,9 @@
         "createdTime": "建立時間",
         "project": "專案",
         "aiSummary": "AI 摘要",
+        "conversationTimeline": "反饋記錄",
+        "userLabel": "用戶",
+        "timelineSummary": "共 {total} 條記錄（AI {ai} / 用戶 {user}）",
         "loading": "載入中...",
         "collapsePanel": "收合面板",
         "expandPanel": "展開面板",
@@ -315,7 +318,8 @@
             "noSummary": "暫無摘要",
             "unknown": "未知",
             "inProgress": "進行中",
-            "inProgressSuffix": "(進行中)"
+            "inProgressSuffix": "(進行中)",
+            "copyAll": "複製全部"
         },
         "noSummary": "無摘要",
         "copySessionContent": "複製會話內容",

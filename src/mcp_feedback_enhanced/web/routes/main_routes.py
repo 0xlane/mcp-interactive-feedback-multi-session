@@ -191,7 +191,8 @@ def setup_routes(manager: "WebUIManager"):
                     "feedback_completed": session.feedback_completed.is_set(),
                     "has_websocket": session.websocket is not None,
                     "is_current": session == manager.current_session,
-                    "user_messages": session.user_messages,  # 包含用戶消息記錄
+                    "user_messages": session.user_messages,
+                    "ai_summaries": session.ai_summaries,
                 }
                 sessions_data.append(session_info)
 

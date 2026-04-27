@@ -296,6 +296,9 @@
         "createdTime": "Created Time",
         "project": "Project",
         "aiSummary": "AI Summary",
+        "conversationTimeline": "Feedback History",
+        "userLabel": "User",
+        "timelineSummary": "{total} records (AI {ai} / User {user})",
         "noSummary": "No summary",
         "loading": "Loading...",
         "collapsePanel": "Collapse Panel",
@@ -310,7 +313,8 @@
             "noSummary": "No summary available",
             "unknown": "Unknown",
             "inProgress": "In progress",
-            "inProgressSuffix": "(in progress)"
+            "inProgressSuffix": "(in progress)",
+            "copyAll": "Copy All"
         },
         "copySessionContent": "Copy Session Content",
         "copyUserContent": "Copy User Content",

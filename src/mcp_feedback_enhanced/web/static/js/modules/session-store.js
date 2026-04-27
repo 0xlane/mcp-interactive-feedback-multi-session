@@ -79,6 +79,7 @@
             feedback_completed: !!rec.feedback_completed,
             is_current: !!rec.is_current,
             user_messages: Array.isArray(rec.user_messages) ? rec.user_messages.slice() : [],
+            ai_summaries: Array.isArray(rec.ai_summaries) ? rec.ai_summaries.slice() : [],
             has_pending_notification: !!rec.has_pending_notification
         };
     }

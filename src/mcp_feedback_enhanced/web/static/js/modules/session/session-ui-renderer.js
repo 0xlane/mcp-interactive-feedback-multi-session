@@ -592,15 +592,35 @@
      * 計算顯示用的持續時間
      */
     SessionUIRenderer.prototype.calculateDisplayDuration = function(sessionData) {
+        var normalize = function(ts) { return ts > 1e12 ? ts / 1000 : ts; };
+        var i18n = window.i18nManager;
+        var inProgressSuffix = i18n ? i18n.t('sessionManagement.sessionDetails.inProgressSuffix') : '(进行中)';
+
         if (sessionData.duration && sessionData.duration > 0) {
             return TimeUtils.formatDuration(sessionData.duration);
         } else if (sessionData.created_at && sessionData.completed_at) {
-            const duration = sessionData.completed_at - sessionData.created_at;
+            var duration = sessionData.completed_at - sessionData.created_at;
             return TimeUtils.formatDuration(duration);
+        } else if (sessionData.created_at && sessionData.last_activity) {
+            var terminalStatuses = ['completed', 'timeout', 'error', 'expired', 'closed'];
+            var isTerminal = terminalStatuses.indexOf(sessionData.status) !== -1;
+            if (isTerminal) {
+                var created = normalize(sessionData.created_at);
+                var lastAct = normalize(sessionData.last_activity);
+                var diff = lastAct - created;
+                if (diff > 0) {
+                    return TimeUtils.formatDuration(diff);
+                }
+            }
+            var elapsed = TimeUtils.calculateElapsedTime(sessionData.created_at);
+            if (elapsed > 0) {
+                return TimeUtils.formatDuration(elapsed) + ' ' + inProgressSuffix;
+            }
+            return TimeUtils.estimateSessionDuration(sessionData);
         } else if (sessionData.created_at) {
             return TimeUtils.estimateSessionDuration(sessionData);
         }
-        return window.i18nManager ? window.i18nManager.t('sessionManagement.sessionDetails.unknown') : '未知';
+        return i18n ? i18n.t('sessionManagement.sessionDetails.unknown') : '未知';
     };
 
     /**

@@ -214,7 +214,7 @@ class WebFeedbackSession:
 
         # 定義狀態流轉路徑
         next_status_map = {
-            SessionStatus.WAITING: SessionStatus.ACTIVE,
+            SessionStatus.WAITING: SessionStatus.FEEDBACK_SUBMITTED,
             SessionStatus.ACTIVE: SessionStatus.FEEDBACK_SUBMITTED,
             SessionStatus.FEEDBACK_SUBMITTED: SessionStatus.COMPLETED,
             SessionStatus.COMPLETED: None,  # 終態
@@ -239,7 +239,6 @@ class WebFeedbackSession:
         else:
             # 默認消息
             default_messages = {
-                SessionStatus.ACTIVE: "會話已啟動",
                 SessionStatus.FEEDBACK_SUBMITTED: "用戶已提交反饋",
                 SessionStatus.COMPLETED: "會話已完成",
             }
@@ -686,12 +685,6 @@ class WebFeedbackSession:
         self.settings = settings or {}
         self.images = self._process_images(images)
 
-        # next_step 一次只能前進一階；直接從 WAITING 調用會落在 ACTIVE 而非
-        # FEEDBACK_SUBMITTED，因此若當前還在 WAITING 必須先補一次流轉
-        # （WAITING → ACTIVE → FEEDBACK_SUBMITTED），保持語義：呼叫
-        # submit_feedback 後狀態一定是「已提交」。
-        if self.status == SessionStatus.WAITING:
-            self.next_step("會話已啟動")
         self.next_step("已送出反饋，等待下次 MCP 調用")
 
         self.feedback_completed.set()

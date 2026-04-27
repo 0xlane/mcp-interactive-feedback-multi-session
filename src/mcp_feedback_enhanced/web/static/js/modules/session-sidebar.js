@@ -294,7 +294,7 @@
         });
 
         if (this.waitingBadgeEl) this.waitingBadgeEl.textContent = stats.waiting;
-        if (this.activeBadgeEl)  this.activeBadgeEl.textContent  = stats.active;
+        if (this.activeBadgeEl)  this.activeBadgeEl.textContent  = stats.feedback_submitted;
 
         if (sessions.length === 0) {
             if (this.emptyEl) this.emptyEl.style.display = '';

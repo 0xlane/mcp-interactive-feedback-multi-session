@@ -258,13 +258,11 @@ Agent 端的 `mcp.json` 由
 ```mermaid
 stateDiagram-v2
     [*] --> WAITING: MCP tool 调用创建
-    WAITING --> ACTIVE: 浏览器打开并对焦该会话
-    ACTIVE --> FEEDBACK_SUBMITTED: 用户提交反馈
+    WAITING --> FEEDBACK_SUBMITTED: 用户提交反馈
     FEEDBACK_SUBMITTED --> COMPLETED: MCP tool 取走结果
     WAITING --> TIMEOUT: MCP tool 自身超时
     WAITING --> EXPIRED: 空闲超 max_idle_time
     WAITING --> CANCELED: 用户主动归档 WAITING 会话
-    ACTIVE --> CANCELED: 用户主动归档 ACTIVE 会话
     COMPLETED --> [*]: 软可见期后清理
     TIMEOUT --> [*]: 同上
     EXPIRED --> [*]: 同上
@@ -290,7 +288,7 @@ stateDiagram-v2
 
 | 触发时会话状态 | 归档语义 | 服务端动作 | UI 行为 |
 |---|---|---|---|
-| `WAITING` / `ACTIVE`（MCP tool 阻塞在 `wait_for_feedback`） | **取消**：让 Agent 拿到"用户取消" | 设 `feedback_result = None`，`feedback_completed.set()`，走清理；MCP tool 返回 `TextContent("用户取消了反馈。")` | 二次确认弹窗 |
+| `WAITING`（MCP tool 阻塞在 `wait_for_feedback`） | **取消**：让 Agent 拿到"用户取消" | 设 `feedback_result = None`，`feedback_completed.set()`，走清理；MCP tool 返回 `TextContent("用户取消了反馈。")` | 二次确认弹窗 |
 | `FEEDBACK_SUBMITTED`（已提交，MCP 尚未取走） | 几乎不触发；触发则仅 UI 隐藏，服务端保留 | 仅标记 UI 隐藏 | 无确认 |
 | `COMPLETED` / `TIMEOUT` / `EXPIRED` / `ERROR`（终态） | 纯 UI 清理 | 从 `sessions` 字典移除，写入 `session_history.json` | 无确认 |
 
@@ -326,7 +324,7 @@ stateDiagram-v2
 ```
 
 **排序规则**：
-- 第一组：`WAITING` / `ACTIVE`（红点 / 实心圆），按"等待时间最久"降序；
+- 第一组：`WAITING`（红点），按"等待时间最久"降序；
 - 第二组：`FEEDBACK_SUBMITTED`（橙点），按时间降序；
 - 第三组：终态（灰勾 / 灰叉），按时间降序；折叠到"历史"。
 

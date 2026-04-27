@@ -9,6 +9,48 @@ and is not tracked here.
 
 ---
 
+## [v3.2.0] - 2026-04-27 - AI Conversation Timeline, Simplified State Flow & Connection Stability
+
+### 🌟 Highlights
+- AI summaries are now persisted as history; the frontend merges them with user
+  messages into a chronological conversation timeline
+- Session state flow simplified: skips the ACTIVE transitional state, going
+  directly from WAITING to FEEDBACK_SUBMITTED
+- "Last prompt" button replaced with "Last submission" — reuses the user's most
+  recently submitted feedback text from the current session
+
+### ✨ New Features
+- 🕐 **AI summary history & conversation timeline**: backend stores historical
+  AI summaries in an `ai_summaries` list; frontend merges AI summaries and user
+  messages into a chronological timeline in the session details modal; session
+  duration fixed with real timestamps; new i18n keys (`userLabel`,
+  `timelineSummary`, `copyAll`); includes `inject_test_session.py` test script
+- 🔄 **"Last submission" button**: the former "Last prompt" button no longer
+  recalls saved prompt templates — it reuses the user's most recently submitted
+  feedback text from the current session's `user_messages`
+
+### ♻️ Refactoring
+- ⚡ **Skip ACTIVE transitional state**: state flow simplified to WAITING →
+  FEEDBACK_SUBMITTED; `submit_feedback()` calls `next_step()` once; sidebar
+  "in progress" badge now counts `feedback_submitted` sessions
+- 🧹 **Remove daemon PID lock**: dropped `DaemonPidLock` from `daemon.py`,
+  `__main__.py`, and `utils/__init__.py`; removed `--pid-file` CLI argument;
+  cleaned up PID-lock references across 12 doc files
+
+### 🐛 Bug Fixes
+- 🔄 **Restore currentSession on page refresh**: `loadFromServer` now sets
+  `currentSession` from `/api/all-sessions` when empty after page refresh,
+  fixing "no current session data" on the workspace copy button
+- 🔌 **MCP connection logging & Ctrl+C shutdown**: moved new-client log into
+  `send_wrapper` for SSE response interception; replaced `@app.middleware` with
+  pure ASGI middleware to eliminate `CancelledError` on shutdown; switched to
+  `uvicorn.error` logger; skipped compression for `/mcp` paths; increased
+  `timeout_graceful_shutdown` to 2s
+- 📝 **Markdown rendering lost on page refresh**: removed duplicate `setTimeout`
+  re-render that overwrote correctly formatted content
+
+---
+
 ## [v3.1.1] - 2026-04-25 - Smart Session Matching, Draft Isolation & Stability
 
 ### 🌟 Highlights

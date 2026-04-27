@@ -101,7 +101,7 @@ Daemon 启动后，FastMCP 将以 Streamable HTTP 传输挂在 `/mcp/`。Agent �
 
 - `status` 可选值：`completed`、`timeout`、`expired`、`canceled`、
   `error`、以及特殊值 `all_terminal`（= 以上全部）。
-- 不能用来删除 `WAITING` / `ACTIVE` / `FEEDBACK_SUBMITTED`，请改用
+- 不能用来删除 `WAITING` / `FEEDBACK_SUBMITTED`，请改用
   `POST /api/sessions/{id}/archive`。
 - 响应：
 
@@ -114,7 +114,7 @@ Daemon 启动后，FastMCP 将以 Streamable HTTP 传输挂在 `/mcp/`。Agent �
 手动归档单个会话（对应 UI 上的「清除」按钮）。
 
 - Body（可选）：`{ "reason": "手动归档原因" }`
-- 对 `WAITING` / `ACTIVE` 会话：调用 `session.cancel()` 解锁
+- 对 `WAITING` 会话：调用 `session.cancel()` 解锁
   `wait_for_feedback`，对应 MCP 调用返回「用户取消」。
 - 对 `FEEDBACK_SUBMITTED` / 终态会话：仅做 UI 归档（物理移除）。
 - 若归档的是当前活跃会话，活跃指针会被 `_select_fallback_active_session`
@@ -277,7 +277,6 @@ type SessionSnapshot = {
   title: string | null;
   status:
     | "waiting"
-    | "active"
     | "feedback_submitted"
     | "completed"
     | "error"

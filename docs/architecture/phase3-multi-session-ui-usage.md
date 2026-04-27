@@ -82,7 +82,7 @@ uv run python -m mcp_feedback_enhanced serve --http
 - **主文**：`title`（Agent 在 `interactive_feedback(title="...")`
   里传入）→ `summary` 截断 40 字 → `session_id` 前 8 位，依次兜底；
 - **副文**：相对时间 + summary 尾部；
-- **状态点**：红色脉动=WAITING、绿色实心=ACTIVE、橙色实心=已提交、
+- **状态点**：红色脉动=WAITING、橙色实心=已提交、
   灰色=终态；
 - **pending 小红点**：新会话到达时你不在看它，它会挂一个红点；点开
   即消失；
@@ -138,7 +138,6 @@ uv run python -m mcp_feedback_enhanced serve --http
 |---|---|
 | 没有任何活跃会话 | 显示空态占位卡片 + 表单整体禁用 |
 | 查看 WAITING 会话 | 正常可输入可提交 |
-| 查看 ACTIVE 会话 | 同上 |
 | 查看 `FEEDBACK_SUBMITTED` | textarea 只读、提交按钮显示「已提交」 |
 | 查看终态 (COMPLETED / CANCELED / TIMEOUT / EXPIRED / ERROR) | 全部只读，按钮禁用 |
 
@@ -210,7 +209,7 @@ UI 隐藏**，是**后端真的从字典移除**：
 
 | 归档时的会话状态 | 行为 |
 |---|---|
-| WAITING / ACTIVE（MCP tool 还在 `wait_for_feedback`） | 后端 `session.cancel()` 解锁 `feedback_completed`，MCP tool 返回「用户取消了反馈」；会话从 `self.sessions` 字典 pop；侧栏卡片消失 |
+| WAITING（MCP tool 还在 `wait_for_feedback`） | 后端 `session.cancel()` 解锁 `feedback_completed`，MCP tool 返回「用户取消了反馈」；会话从 `self.sessions` 字典 pop；侧栏卡片消失 |
 | FEEDBACK_SUBMITTED（用户已提交但 MCP 还没取走） | 同步 `session.cleanup()` + 字典 pop。MCP 那边返回前的提交结果已经写在 `feedback_result` 里，不受影响 |
 | 终态（COMPLETED / TIMEOUT / EXPIRED / CANCELED / ERROR） | 纯清理：同步 `cleanup()` + 字典 pop |
 
@@ -307,7 +306,7 @@ MCPFeedback.AppShellModal.getCurrent();
 |---|---|---|
 | 侧栏折叠状态 `localStorage` 持久化 | ✅ 已做 | — |
 | 3 层信息架构（顶栏设定/关于、侧栏底部会话历史、Tab 栏仅会话级） | ✅ 已做 | §3.3 |
-| 归档二次确认弹窗（仅 WAITING/ACTIVE 会话） | ⏳ 未做 | 阶段 4 |
+| 归档二次确认弹窗（仅 WAITING 会话） | ⏳ 未做 | 阶段 4 |
 | 会话历史（超过保留期后的回看界面） | ⏳ 未做 | 阶段 4/5 |
 | 音效通知 Phase 3 没接线 | ⏳ 未做 | 阶段 4/5 可选 |
 | 桌面模式（Tauri） | 🚫 暂停维护 | 已在 §7 设计文档说明 |

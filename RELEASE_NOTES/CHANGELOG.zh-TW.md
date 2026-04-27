@@ -9,6 +9,41 @@
 
 ---
 
+## [v3.2.0] - 2026-04-27 - AI 對話時間線、狀態流簡化與連線穩定性
+
+### 🌟 版本亮點
+- AI 摘要歷史持久化保存，前端將 AI 摘要與使用者訊息合併為按時間排列的對話時間線
+- 會話狀態流簡化：跳過 ACTIVE 過渡態，WAITING 直接進入 FEEDBACK_SUBMITTED
+- 「上次提示」按鈕改為「上次提交」，復用當前會話中使用者最近提交的回饋文字
+
+### ✨ 新功能
+- 🕐 **AI 摘要歷史與對話時間線**：後端將歷次 AI 摘要保存在 `ai_summaries`
+  清單中；前端在會話詳情彈窗中將 AI 摘要與使用者訊息按時間合併為對話時間線；
+  修正會話時長計算；新增 i18n key（`userLabel`、`timelineSummary`、`copyAll`）；
+  附帶 `inject_test_session.py` 測試腳本
+- 🔄 **「上次提交」按鈕**：原「上次提示」按鈕不再回調已保存的提示詞範本，
+  改為復用當前會話中使用者最近一條已提交的回饋文字
+
+### ♻️ 重構
+- ⚡ **跳過 ACTIVE 過渡態**：狀態流簡化為 WAITING → FEEDBACK_SUBMITTED；
+  `submit_feedback()` 僅呼叫一次 `next_step()`；側欄「進行中」徽章改為
+  統計 `feedback_submitted` 狀態的會話
+- 🧹 **移除 daemon PID 鎖單實例偵測**：刪除 `DaemonPidLock`、`--pid-file`
+  CLI 參數，清理 12 個文件中的 PID 鎖引用
+
+### 🐛 問題修復
+- 🔄 **頁面重整後恢復 currentSession**：`loadFromServer` 在頁面重整後從
+  `/api/all-sessions` 恢復 `currentSession`，修復工作區複製按鈕提示
+  「無當前會話資料」
+- 🔌 **MCP 連線日誌與 Ctrl+C 關閉最佳化**：將新客戶端日誌移入 `send_wrapper`
+  以攔截 SSE 回應；替換 `@app.middleware` 為純 ASGI 中介軟體消除關閉時
+  `CancelledError`；使用 `uvicorn.error` 日誌器；`/mcp` 路徑跳過壓縮；
+  `timeout_graceful_shutdown` 提升至 2s
+- 📝 **頁面重整後 Markdown 渲染遺失**：移除重複的 `setTimeout` 重繪邏輯，
+  不再覆寫已正確格式化的內容
+
+---
+
 ## [v3.1.1] - 2026-04-25 - 會話智能匹配、草稿隔離與穩定性修復
 
 ### 🌟 版本亮點

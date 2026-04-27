@@ -21,7 +21,7 @@ ROUNDS = [
     },
     {
         "summary": "# Round 3\n\nAdded testing framework:\n- Installed jest with ts-jest\n- Created jest.config.ts\n- Added sample test",
-        "user_feedback": "Perfect, we're done for now.",
+        "user_feedback": None,  # Last round: wait for user to submit manually
     },
 ]
 
@@ -204,7 +204,7 @@ async def main():
             args = {
                 "project_directory": project_dir,
                 "summary": round_data["summary"],
-                "timeout": 60,
+                "timeout": 600,
                 "title": title,
             }
             if feedback_session_id:
@@ -228,6 +228,16 @@ async def main():
             print(f"  Session found: {session_id}")
             feedback_session_id = session_id
 
+            if round_data["user_feedback"] is None:
+                print("  ⏳ Last round — waiting for you to submit feedback in the browser...")
+                print(f"  Open http://127.0.0.1:9999 and submit feedback for session '{title}'")
+                try:
+                    status_code, text = await asyncio.wait_for(tool_task, timeout=300)
+                    print(f"  Tool call completed: HTTP {status_code}")
+                except asyncio.TimeoutError:
+                    print("  Tool call timed out after 5 min")
+                break
+
             # Small delay to simulate realistic timing
             await asyncio.sleep(1.5)
 
@@ -250,7 +260,6 @@ async def main():
                         content = result["result"].get("content", [])
                         for c in content:
                             if c.get("type") == "text" and "feedback_session_id" in c.get("text", ""):
-                                # Extract session ID from text
                                 pass
                 except json.JSONDecodeError:
                     pass

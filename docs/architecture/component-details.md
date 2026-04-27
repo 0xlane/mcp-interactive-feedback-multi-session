@@ -162,7 +162,6 @@ if not prior_active_valid:
 ```python
 class SessionStatus(Enum):
     WAITING                 # 等待用户提交
-    ACTIVE                  # 用户已切换到此会话（可选态）
     FEEDBACK_SUBMITTED      # 已提交，等 MCP 端收口
     COMPLETED               # wait_for_feedback 已返回
     ERROR / TIMEOUT / EXPIRED / CANCELED
@@ -177,7 +176,7 @@ class SessionStatus(Enum):
 | `add_user_message(msg)` / `add_log(entry)` | 用户消息、执行日志的累加 |
 | `run_command(command)` | （遗留）允许页面执行命令；在日志中回显 |
 | `cancel(message)` / `set_error(message)` / `set_expired(message)` | 终态转移 |
-| `next_step(message=None)` | 状态机显式推进（例如 WAITING → ACTIVE） |
+| `next_step(message=None)` | 状态机显式推进（例如 WAITING → FEEDBACK_SUBMITTED） |
 | `is_active()` / `is_terminal()` / `is_expired()` | 状态查询 |
 | `get_status_info()` / `get_cleanup_stats()` | 给 `/api/sessions*` 用的摘要 |
 | `extend_cleanup_timer(additional_time=None)` | 延长闲置保留期 |

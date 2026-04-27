@@ -106,7 +106,7 @@ v3.0 的目标非常聚焦：
 │   WebUIManager       → 单例，进程级会话字典、活跃指针、      │
 │                          WS 连接集合、广播总线               │
 │   WebFeedbackSession → 单个会话的状态机                      │
-│   SessionStatus      → WAITING/ACTIVE/FEEDBACK_SUBMITTED/   │
+│   SessionStatus      → WAITING/FEEDBACK_SUBMITTED/           │
 │                          COMPLETED/ERROR/TIMEOUT/EXPIRED/   │
 │                          CANCELED                           │
 ├─────────────────────────────────────────────────────────────┤

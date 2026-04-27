@@ -649,6 +649,23 @@
                     self.sessionHistory = data.sessions;
                     console.log('📊 從伺服器載入', self.sessionHistory.length, '個實時會話狀態');
 
+                    if (!self.currentSession) {
+                        var current = data.sessions.find(function(s) { return s.is_current; });
+                        if (!current) {
+                            var activeStatuses = ['waiting', 'active', 'feedback_submitted'];
+                            current = data.sessions.find(function(s) {
+                                return activeStatuses.indexOf(s.status) !== -1;
+                            });
+                        }
+                        if (current) {
+                            self.currentSession = self.normalizeSessionData(current);
+                            console.log('📊 從伺服器恢復當前會話:', current.session_id);
+                            if (self.onSessionChange) {
+                                self.onSessionChange(self.currentSession);
+                            }
+                        }
+                    }
+
                     // 載入完成後進行清理和統計更新
                     self.cleanupExpiredSessions();
                     self.updateStats();

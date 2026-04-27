@@ -449,16 +449,16 @@
         },
         "buttons": {
             "selectPrompt": "常用提示",
-            "useLastPrompt": "上次提示",
+            "useLastFeedback": "上次提交",
             "noPrompts": "尚無常用提示詞，請先在設定中新增",
-            "noLastPrompt": "尚無最近使用的提示詞",
-            "lastPromptApplied": "已套用上次使用的提示詞",
+            "noLastFeedback": "尚無上次提交記錄",
+            "lastFeedbackApplied": "已填入上次提交的內容",
             "promptNotFound": "找不到指定的提示詞",
             "promptApplied": "已套用提示詞：",
             "selectPromptTooltipEmpty": "尚無常用提示詞",
             "selectPromptTooltipAvailable": "選擇常用提示詞 ({count} 個可用)",
-            "lastPromptTooltipEmpty": "尚無最近使用的提示詞",
-            "lastPromptTooltipAvailable": "使用上次提示詞：{name}"
+            "lastFeedbackTooltipEmpty": "尚無上次提交記錄",
+            "lastFeedbackTooltipAvailable": "填入上次提交的反饋內容"
         },
         "select": {
             "title": "選擇常用提示詞"

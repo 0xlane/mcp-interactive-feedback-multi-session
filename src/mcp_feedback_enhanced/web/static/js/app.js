@@ -851,7 +851,8 @@
             // 4. 初始化輸入按鈕
             this.promptInputButtons = new window.MCPFeedback.Prompt.PromptInputButtons({
                 promptManager: this.promptManager,
-                promptModal: this.promptModal
+                promptModal: this.promptModal,
+                sessionManager: this.sessionManager
             });
 
             // 初始化輸入按鈕到回饋輸入區域

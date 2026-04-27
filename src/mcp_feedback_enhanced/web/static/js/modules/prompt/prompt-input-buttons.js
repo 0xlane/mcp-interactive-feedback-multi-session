@@ -23,6 +23,7 @@
         // 依賴注入
         this.promptManager = options.promptManager || null;
         this.promptModal = options.promptModal || null;
+        this.sessionManager = options.sessionManager || null;
 
         // UI 元素
         this.containers = [];
@@ -175,28 +176,34 @@
     };
 
     /**
-     * 處理使用上次提示詞
+     * 處理使用上次提交的反饋
      */
     PromptInputButtons.prototype.handleUseLastPrompt = function(containerIndex) {
-        if (!this.promptManager) {
-            console.error('❌ PromptManager 未設定');
+        var lastText = this.getLastFeedbackText();
+
+        if (!lastText) {
+            this.showError(this.t('prompts.buttons.noLastFeedback', '尚無上次提交記錄'));
             return;
         }
 
-        const lastPrompt = this.promptManager.getLastUsedPrompt();
-        
-        if (!lastPrompt) {
-            this.showError(this.t('prompts.buttons.noLastPrompt', '尚無最近使用的提示詞'));
-            return;
+        this.insertPromptContent(containerIndex, { content: lastText });
+
+        this.showSuccess(this.t('prompts.buttons.lastFeedbackApplied', '已填入上次提交的內容'));
+    };
+
+    /**
+     * 獲取上次提交的反饋文本（從當前會話的 user_messages 讀取）
+     */
+    PromptInputButtons.prototype.getLastFeedbackText = function() {
+        try {
+            if (!this.sessionManager || !this.sessionManager.dataManager) return null;
+            var session = this.sessionManager.dataManager.getCurrentSession();
+            if (!session || !session.user_messages || session.user_messages.length === 0) return null;
+            var lastMsg = session.user_messages[session.user_messages.length - 1];
+            return lastMsg.content || lastMsg.text || null;
+        } catch (e) {
+            return null;
         }
-
-        // 插入提示詞內容
-        this.insertPromptContent(containerIndex, lastPrompt);
-
-        // 更新使用記錄
-        this.promptManager.usePrompt(lastPrompt.id);
-
-        this.showSuccess(this.t('prompts.buttons.lastPromptApplied', '已套用上次使用的提示詞'));
     };
 
     /**
@@ -301,14 +308,13 @@
             }
         });
 
-        // 更新使用上次提示詞按鈕文字
         this.lastUsedButtons.forEach(function(button) {
             if (button) {
                 const textSpan = button.querySelector('.button-text');
                 if (textSpan) {
                     const text = window.i18nManager ?
-                        window.i18nManager.t('prompts.buttons.useLastPrompt', '上次提示') :
-                        '上次提示';
+                        window.i18nManager.t('prompts.buttons.useLastFeedback', '上次提交') :
+                        '上次提交';
                     textSpan.textContent = text;
                 }
             }
@@ -324,7 +330,6 @@
         }
 
         const prompts = this.promptManager.getAllPrompts();
-        const lastPrompt = this.promptManager.getLastUsedPrompt();
 
         // 更新選擇提示詞按鈕
         this.selectButtons.forEach(function(button) {
@@ -344,20 +349,20 @@
             }
         });
 
-        // 更新使用上次提示詞按鈕
+        var hasLastFeedback = !!this.getLastFeedbackText();
+
         this.lastUsedButtons.forEach(function(button) {
             if (button) {
-                button.disabled = !lastPrompt;
+                button.disabled = !hasLastFeedback;
 
-                if (!lastPrompt) {
+                if (!hasLastFeedback) {
                     button.title = window.i18nManager ?
-                        window.i18nManager.t('prompts.buttons.lastPromptTooltipEmpty') :
-                        '尚無最近使用的提示詞';
+                        window.i18nManager.t('prompts.buttons.lastFeedbackTooltipEmpty', '尚無上次提交記錄') :
+                        '尚無上次提交記錄';
                 } else {
-                    const tooltipText = window.i18nManager ?
-                        window.i18nManager.t('prompts.buttons.lastPromptTooltipAvailable', { name: lastPrompt.name }) :
-                        `使用上次提示詞：${lastPrompt.name}`;
-                    button.title = tooltipText;
+                    button.title = window.i18nManager ?
+                        window.i18nManager.t('prompts.buttons.lastFeedbackTooltipAvailable', '填入上次提交的反饋內容') :
+                        '填入上次提交的反饋內容';
                 }
             }
         });

@@ -444,16 +444,16 @@
         },
         "buttons": {
             "selectPrompt": "Templates",
-            "useLastPrompt": "Last Used",
+            "useLastFeedback": "Last Submit",
             "noPrompts": "No prompt templates available, please add one in settings first",
-            "noLastPrompt": "No recently used prompt available",
-            "lastPromptApplied": "Last used prompt applied successfully",
+            "noLastFeedback": "No previous submission available",
+            "lastFeedbackApplied": "Last submitted feedback inserted",
             "promptNotFound": "Prompt not found",
             "promptApplied": "Prompt applied: ",
             "selectPromptTooltipEmpty": "No prompt templates available",
             "selectPromptTooltipAvailable": "Select prompt template ({count} available)",
-            "lastPromptTooltipEmpty": "No recently used prompt available",
-            "lastPromptTooltipAvailable": "Use last prompt: {name}"
+            "lastFeedbackTooltipEmpty": "No previous submission available",
+            "lastFeedbackTooltipAvailable": "Insert last submitted feedback"
         },
         "select": {
             "title": "Select Prompt Template"

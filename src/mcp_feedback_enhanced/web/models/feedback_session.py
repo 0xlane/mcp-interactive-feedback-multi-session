@@ -139,6 +139,7 @@ class WebFeedbackSession:
         self.images: list[dict] = []
         self.settings: dict[str, Any] = {}  # 圖片設定
         self.feedback_completed = threading.Event()
+        self._async_feedback_completed = asyncio.Event()
         self.process: subprocess.Popen | None = None
         self.command_logs: list[str] = []
         self.user_messages: list[dict] = []  # 用戶消息記錄
@@ -198,6 +199,15 @@ class WebFeedbackSession:
         debug_log(
             f"會話 {self.session_id} 初始化完成，自動清理延遲: {auto_cleanup_delay}秒，最大空閒: {max_idle_time}秒"
         )
+
+    def _signal_feedback_completed(self) -> None:
+        """同時觸發同步與非同步完成事件，避免執行緒阻塞"""
+        self.feedback_completed.set()
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(self._async_feedback_completed.set)
+        except RuntimeError:
+            self._async_feedback_completed.set()
 
     def get_message_code(self, key: str) -> str:
         """
@@ -330,7 +340,7 @@ class WebFeedbackSession:
         self.status_message = message
         self.last_activity = time.time()
         self.feedback_result = None
-        self.feedback_completed.set()
+        self._signal_feedback_completed()
 
         debug_log(
             f"🚫 會話 {self.session_id} 已取消: {old_status.value} → canceled - {message}"
@@ -391,6 +401,7 @@ class WebFeedbackSession:
         self.status = SessionStatus.WAITING
         self.status_message = "等待用戶回饋"
         self.feedback_completed.clear()
+        self._async_feedback_completed.clear()
         self.feedback_result = None
         if not was_waiting:
             self.images = []
@@ -563,9 +574,10 @@ class WebFeedbackSession:
                 self.status = SessionStatus.TIMEOUT
                 self.status_message = "用戶設定的會話超時"
                 # 設置完成事件，讓 wait_for_feedback 結束等待
-                self.feedback_completed.set()
+                self._signal_feedback_completed()
 
             self.user_timeout_timer = threading.Timer(timeout_seconds, timeout_handler)
+            self.user_timeout_timer.daemon = True
             self.user_timeout_timer.start()
             debug_log(f"已啟動用戶超時計時器: {timeout_seconds}秒")
 
@@ -590,12 +602,14 @@ class WebFeedbackSession:
                 f"會話 {self.session_id} 開始等待回饋，超時時間: {actual_timeout} 秒（原始: {timeout} 秒）"
             )
 
-            loop = asyncio.get_event_loop()
-
-            def wait_in_thread():
-                return self.feedback_completed.wait(actual_timeout)
-
-            completed = await loop.run_in_executor(None, wait_in_thread)
+            try:
+                await asyncio.wait_for(
+                    self._async_feedback_completed.wait(),
+                    timeout=float(actual_timeout),
+                )
+                completed = True
+            except asyncio.TimeoutError:
+                completed = False
 
             if completed:
                 # 檢查是否是用戶設定的超時
@@ -692,7 +706,7 @@ class WebFeedbackSession:
         self.status_message = "已送出反饋，等待下次 MCP 調用"
         self.last_activity = time.time()
 
-        self.feedback_completed.set()
+        self._signal_feedback_completed()
 
         # 廣播：反饋已收到（階段 3 新增獨立事件 + 舊版 notification 兼容）
         try:
@@ -1019,7 +1033,7 @@ class WebFeedbackSession:
                     self.process = None
 
             # 4. 設置完成事件（防止其他地方還在等待）
-            self.feedback_completed.set()
+            self._signal_feedback_completed()
 
             # 5. 清理臨時數據
             logs_count = len(self.command_logs)
@@ -1168,7 +1182,7 @@ class WebFeedbackSession:
 
             # 4. 設置完成事件
             if not preserve_websocket:
-                self.feedback_completed.set()
+                self._signal_feedback_completed()
 
             # 5. 更新狀態（若已處於終態則保留，不覆蓋）
             if not preserve_websocket:

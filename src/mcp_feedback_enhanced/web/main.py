@@ -1352,6 +1352,21 @@ class WebUIManager:
         self.sessions.clear()
         self.current_session = None
 
+        # 停止內存監控
+        if hasattr(self, "memory_monitor") and self.memory_monitor:
+            try:
+                self.memory_monitor.stop_monitoring()
+            except Exception as e:
+                debug_log(f"停止內存監控失敗: {e}")
+
+        # 停止資源管理器自動清理
+        try:
+            from ..utils.resource_manager import get_resource_manager
+
+            get_resource_manager().stop_auto_cleanup()
+        except Exception as e:
+            debug_log(f"停止資源管理器自動清理失敗: {e}")
+
         # 更新統計
         cleanup_duration = time.time() - cleanup_start_time
         self.cleanup_stats.update(

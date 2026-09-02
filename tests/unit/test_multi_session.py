@@ -272,3 +272,39 @@ class TestSessionStatusEnum:
         s = WebFeedbackSession("sid", "/tmp", "summary")
         s.set_expired("expired")
         assert s.cancel() is False
+
+
+class TestShutdownAndCancellation:
+    """伺服器關閉與 Ctrl-C 信號處理相關測試"""
+
+    @pytest.mark.asyncio
+    async def test_wait_for_feedback_cancellation(self, test_project_dir):
+        """wait_for_feedback 被 asyncio 取消時應立即中斷，不阻塞執行緒池。"""
+        s = WebFeedbackSession("test-cancel", str(test_project_dir), "測試取消")
+        task = asyncio.create_task(s.wait_for_feedback(timeout=60))
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    def test_user_timeout_timer_is_daemon(self, test_project_dir):
+        """自訂超時計時器必須為 daemon 線程，避免阻塞程序退出。"""
+        s = WebFeedbackSession("test-timer", str(test_project_dir), "測試計時器")
+        s.update_timeout_settings(enabled=True, timeout_seconds=100)
+        assert s.user_timeout_timer is not None
+        assert s.user_timeout_timer.daemon is True
+        s.user_timeout_timer.cancel()
+
+    def test_manager_stop_cleans_resources_and_threads(self, web_ui_manager, test_project_dir):
+        """manager.stop() 應清理所有會話、停止內存監控與資源管理器後台線程。"""
+        web_ui_manager.create_session(str(test_project_dir), "測試停機 1")
+        web_ui_manager.create_session(str(test_project_dir), "測試停機 2")
+        assert len(web_ui_manager.sessions) == 2
+
+        web_ui_manager.stop()
+        assert len(web_ui_manager.sessions) == 0
+        assert web_ui_manager.current_session is None
+        if hasattr(web_ui_manager, "memory_monitor") and web_ui_manager.memory_monitor:
+            assert not web_ui_manager.memory_monitor.is_monitoring
+

@@ -111,6 +111,10 @@ def build_daemon_app(
                         )
                     except Exception as e:  # noqa: BLE001
                         debug_log(f"shutting_down 廣播失敗（可忽略）：{e}")
+                    try:
+                        mgr.stop()
+                    except Exception as e:  # noqa: BLE001
+                        debug_log(f"mgr.stop() 失敗（可忽略）：{e}")
                 debug_log("daemon lifespan ending: MCP session manager offline")
 
     manager = WebUIManager(

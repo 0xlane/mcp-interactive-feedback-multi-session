@@ -16,6 +16,7 @@
 - ✅ **Phase 2**（HTTP Daemon）：`uv run mcp-interactive-feedback serve --http` 单实例常驻；FastMCP Streamable HTTP 挂在 `/mcp/`；PID 锁 + 固定端口 `127.0.0.1:8765`
 - ✅ **Phase 3 (UI)**：單瀏覽器頁面 + WebSocket 多路復用 + 雙欄 SPA；粘滯活躍指標；每會話獨立草稿；`Cmd/Ctrl+1..9` 快捷鍵；紅點/`(N)` 標題/Favicon/桌面通知 四層 pending
 - ✅ **進度通知心跳機制 (Progress Heartbeat)**：`interactive_feedback` 注入 FastMCP `Context`，在等待用戶回饋期間每 15 秒（可由 `MCP_PROGRESS_INTERVAL` 配置）自動發送 MCP `notifications/progress`，主動重置 Cursor IDE 內部的 120 秒空閒超時倒計時（`toolCallIdleTimeoutMs`），避免因人工操作耗時而觸發 `-32001 Request timed out`
+- ✅ **信號處理與優雅停機 (Clean Ctrl+C / SIGINT Exit)**：`wait_for_feedback` 改為原生 `asyncio.Event` 異步等待，徹底消除 `ThreadPoolExecutor` 背景工作執行緒阻塞導致進程無法單次 Ctrl+C 退出的問題；`combined_lifespan` 與 `WebUIManager.stop()` 聯動清理後台監控與計時器資源
 - ✅ **3 層信息架構**（最後一輪 UI 整理）：頂欄放應用級動作（⚙️ 設定 / ℹ️ 關於）、左欄底部放 🗂️ 會話歷史、右欄 Tab 僅保留會話級內容（工作區（AI 摘要嵌入其中）/ 命令）
 
 ### 关键决策回顾

@@ -30,7 +30,7 @@ import os
 import sys
 from typing import Annotated, Any
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.utilities.types import Image as MCPImage
 from mcp.types import ImageContent, TextContent
 from pydantic import Field
@@ -453,6 +453,7 @@ async def interactive_feedback(
             )
         ),
     ] = None,
+    ctx: Context = None,
 ) -> list:
     """Interactive feedback collection tool for LLM agents.
 
@@ -516,6 +517,7 @@ async def interactive_feedback(
         result = await launch_web_feedback_ui(
             project_directory, summary, effective_timeout,
             title=title, feedback_session_id=feedback_session_id,
+            ctx=ctx,
         )
 
         # 處理取消情況（使用者手動歸檔會讓 wait_for_feedback 返回空 dict）
@@ -585,6 +587,7 @@ async def launch_web_feedback_ui(
     timeout: int,
     title: str | None = None,
     feedback_session_id: str | None = None,
+    ctx: Context | None = None,
 ) -> dict:
     """
     啟動 Web UI 收集回饋，支援自訂超時時間和會話標題
@@ -595,6 +598,7 @@ async def launch_web_feedback_ui(
         timeout: 超時時間（秒）
         title: 會話標題（可選）
         feedback_session_id: 上一輪的 session ID（可選），用於復用 session
+        ctx: MCP 請求上下文（可選），用於週期性發送進度通知重置客戶端超時
 
     Returns:
         dict: 收集到的回饋資料（空 dict 表示使用者取消）
@@ -608,6 +612,7 @@ async def launch_web_feedback_ui(
         return await web_launch(
             project_dir, summary, timeout,
             title=title, feedback_session_id=feedback_session_id,
+            ctx=ctx,
         )
     except ImportError as e:
         # 使用統一錯誤處理

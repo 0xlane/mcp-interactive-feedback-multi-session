@@ -1405,6 +1405,7 @@ async def launch_web_feedback_ui(
     timeout: int = 600,
     title: str | None = None,
     feedback_session_id: str | None = None,
+    ctx: Any | None = None,
 ) -> dict:
     """
     啟動 Web 回饋介面並等待用戶回饋 - 重構為使用根路徑
@@ -1416,6 +1417,7 @@ async def launch_web_feedback_ui(
         title: 會話標題（可選），由 AI 傳入用於側欄識別
         feedback_session_id: 上一輪返回的 session ID（可選）。同一對話
             多輪調用傳入相同的 ID 即可復用同一個前端 session 而非建立新的。
+        ctx: FastMCP Context（可選），用於週期性向 Cursor 發送進度通知避免 120 秒超時。
 
     Returns:
         dict: 回饋結果，包含 logs、interactive_feedback 和 images
@@ -1552,6 +1554,61 @@ async def launch_web_feedback_ui(
         if has_active_tabs:
             debug_log("檢測到活躍標籤頁，會話更新通知已發送")
 
+    # 設置 session 的 ctx 引用
+    session.ctx = ctx
+
+    # 進度通知任務（防止 Cursor IDE 120 秒無進度空閒超時）
+    stop_progress = asyncio.Event()
+
+    async def _progress_loop():
+        if ctx is None:
+            return
+        start_time = time.time()
+        # 預設每 15 秒發送一次進度通知（遠低於 Cursor 的 120 秒 idle timeout）
+        interval = 15.0
+        env_interval = os.getenv("MCP_PROGRESS_INTERVAL")
+        if env_interval:
+            try:
+                val = float(env_interval)
+                if val > 0:
+                    interval = val
+            except ValueError:
+                pass
+
+        # 立即發送一次初始進度通知
+        try:
+            await ctx.report_progress(
+                progress=0.0,
+                total=float(timeout),
+                message="Web UI 回饋介面已就緒，等待用戶提供回饋...",
+            )
+            debug_log("[MCP Progress] 初始進度通知發送成功")
+        except Exception as e:
+            debug_log(f"[MCP Progress] 初始進度通知發送失敗: {e}")
+
+        while not stop_progress.is_set():
+            try:
+                await asyncio.wait_for(stop_progress.wait(), timeout=interval)
+                break
+            except asyncio.TimeoutError:
+                elapsed = time.time() - start_time
+                curr_progress = min(elapsed, float(timeout))
+                msg = (
+                    f"等待用戶在 Web UI 提供回饋中（已等待 {int(elapsed)} 秒 / "
+                    f"超時上限 {timeout} 秒）..."
+                )
+                try:
+                    await ctx.report_progress(
+                        progress=curr_progress,
+                        total=float(timeout),
+                        message=msg,
+                    )
+                    debug_log(f"[MCP Progress] 已發送進度通知: {msg}")
+                except Exception as e:
+                    debug_log(f"[MCP Progress] 發送進度通知失敗: {e}")
+
+    progress_task = asyncio.create_task(_progress_loop())
+
     try:
         # 等待用戶回饋，傳遞 timeout 參數
         result = await session.wait_for_feedback(timeout)
@@ -1565,6 +1622,13 @@ async def launch_web_feedback_ui(
         debug_log(f"會話發生錯誤: {e}")
         raise
     finally:
+        stop_progress.set()
+        progress_task.cancel()
+        try:
+            await progress_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        session.ctx = None
         # 注意：不再自動清理會話和停止服務器，保持持久性
         # 會話將保持活躍狀態，等待下次 MCP 調用
         debug_log("會話保持活躍狀態，等待下次 MCP 調用")

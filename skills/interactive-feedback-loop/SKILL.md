@@ -53,13 +53,18 @@ This is necessary because subagents inherit the parent agent's skills and rules 
 - **Respect stop signals** — when the user indicates they're satisfied, stop immediately. Don't call the tool again.
 - **Call on blocked progress too** — if the user skips or rejects a command you proposed (e.g. a test run or shell command), do NOT silently continue or guess the reason. Immediately call the feedback tool to ask the user why they skipped and what they'd like you to do instead. The summary should mention which command was skipped and your current progress.
 
+## Timeout & Progress Notifications
+
+- **Progress Notifications (Heartbeat)**: The server automatically sends MCP `notifications/progress` periodically (every 15 seconds by default) while waiting for user feedback in Web UI. This resets Cursor's internal 120-second idle timeout (`toolCallIdleTimeoutMs`) and keeps the tool call alive for up to 60 minutes (`toolCallMaxTotalTimeoutMs`) or the configured `timeout`.
+- **Configurable Interval**: The progress notification interval can be customized via the `MCP_PROGRESS_INTERVAL` environment variable (default: `15` seconds).
+
 ## Retry Policy
 
-The `interactive_feedback` tool may return `MCP error -32001: Request timed out`. This is caused by Cursor's internal MCP client transport timeout (approximately 60-120 seconds), NOT by the MCP server. The server is still waiting for user input when this error occurs.
+Even with progress notifications, in rare edge cases (e.g. client disconnect, extreme network latency, or reaching the 60-minute Cursor limit), the `interactive_feedback` tool may return `MCP error -32001: Request timed out`.
 
 **When a timeout/error occurs:**
 
-- **Retry immediately** with the exact same parameters. Do NOT give up.
+- **Retry immediately** with the exact same parameters (including `feedback_session_id`). Do NOT give up.
 - **Keep retrying indefinitely** until the tool returns a successful response.
 - **Never fall back to text** — never substitute the tool call with a text message like "还有什么需要调整的吗？". The tool is the only acceptable feedback mechanism.
 - **Never end your turn** without a successful feedback collection (unless the user already signaled completion in a prior successful feedback call).

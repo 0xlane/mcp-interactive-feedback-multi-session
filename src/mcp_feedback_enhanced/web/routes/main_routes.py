@@ -74,7 +74,7 @@ def setup_routes(manager: "WebUIManager"):
                 "project_directory": current_session.project_directory if current_session else "",
                 "summary": current_session.summary if current_session else "",
                 "session_id": current_session.session_id if current_session else "",
-                "title": "Interactive Feedback - 回饋收集",
+                "title": "MCP Feedback Enhanced - 回饋收集",
                 "version": __version__,
                 "has_session": current_session is not None,
                 "layout_mode": layout_mode,

@@ -14,8 +14,9 @@
 
 - ✅ **Phase 1**（后端多会话化）：`WebUIManager.create_session` 改为插入式，不再销毁旧会话；每次 MCP 调用注册一个 `WebFeedbackSession`
 - ✅ **Phase 2**（HTTP Daemon）：`uv run mcp-interactive-feedback serve --http` 单实例常驻；FastMCP Streamable HTTP 挂在 `/mcp/`；PID 锁 + 固定端口 `127.0.0.1:8765`
-- ✅ **Phase 3 (UI)**：单浏览器页面 + WebSocket 多路复用 + 双栏 SPA；粘滞活跃指针；每会话独立草稿；`Cmd/Ctrl+1..9` 快捷键；红点/`(N)` 标题/Favicon/桌面通知 四层 pending
-- ✅ **3 层信息架构**（最后一轮 UI 整理）：顶栏放应用级动作（⚙️ 设定 / ℹ️ 关于）、左栏底部放 🗂️ 会话历史、右栏 Tab 仅保留会话级内容（工作区（AI 摘要嵌入其中）/ 命令）
+- ✅ **Phase 3 (UI)**：單瀏覽器頁面 + WebSocket 多路復用 + 雙欄 SPA；粘滯活躍指標；每會話獨立草稿；`Cmd/Ctrl+1..9` 快捷鍵；紅點/`(N)` 標題/Favicon/桌面通知 四層 pending
+- ✅ **進度通知心跳機制 (Progress Heartbeat)**：`interactive_feedback` 注入 FastMCP `Context`，在等待用戶回饋期間每 15 秒（可由 `MCP_PROGRESS_INTERVAL` 配置）自動發送 MCP `notifications/progress`，主動重置 Cursor IDE 內部的 120 秒空閒超時倒計時（`toolCallIdleTimeoutMs`），避免因人工操作耗時而觸發 `-32001 Request timed out`
+- ✅ **3 層信息架構**（最後一輪 UI 整理）：頂欄放應用級動作（⚙️ 設定 / ℹ️ 關於）、左欄底部放 🗂️ 會話歷史、右欄 Tab 僅保留會話級內容（工作區（AI 摘要嵌入其中）/ 命令）
 
 ### 关键决策回顾
 
@@ -67,5 +68,5 @@
 
 - 文档语言：既有架构文档保留**繁体中文**头部索引，详细内容用**简体中文**（开发者日常沟通语言）；UI 层支持三语（zh-TW / zh-CN / en）
 - 提交规范：Conventional Commits（`refactor(web):` / `fix(web):` / `chore(repo):` / `docs:` 等），commit body 给出"为什么"而非"做了什么"
-- 测试入口：`uv run pytest`（完整 `202 passed`；详见 `tests/`）
+- 測試入口：`uv run pytest`（完整 `206 passed`；詳見 `tests/`）
 - 静态文件改动**必须**同步 bump `feedback.html` 里 `<script src="...?v=YYYYMMDDNN">` 的 cache buster

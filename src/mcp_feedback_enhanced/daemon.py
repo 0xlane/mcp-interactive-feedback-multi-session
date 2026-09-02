@@ -38,6 +38,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from fastapi import FastAPI
 
 
+from .utils.pid_lock import DaemonPidLock
+
+
 __all__ = [
     "DEFAULT_HOST",
     "DEFAULT_PORT",
@@ -165,6 +168,7 @@ def serve_http(
     port: int = DEFAULT_PORT,
     *,
     log_level: str = "info",
+    pid_path: Path | str | None = None,
 ) -> None:
     """以前台方式啟動 HTTP daemon。函式返回即表示 daemon 已退出。
 
@@ -172,20 +176,26 @@ def serve_http(
         host: 綁定主機，預設 ``127.0.0.1``。
         port: 綁定端口，預設 ``8765``。
         log_level: uvicorn 日誌級別。
+        pid_path: 自訂 PID 文件路徑；未傳時使用預設路徑。
     """
     debug_log(f"starting daemon on {host}:{port} (pid={os.getpid()})")
 
-    app, _manager = build_daemon_app(host=host, port=port)
+    lock = DaemonPidLock(pid_path)
+    lock.acquire()
+    try:
+        app, _manager = build_daemon_app(host=host, port=port)
 
-    config = uvicorn.Config(
-        app=app,
-        host=host,
-        port=port,
-        log_level=log_level,
-        access_log=False,
-        ws="auto",
-        timeout_graceful_shutdown=2,
-    )
-    server = uvicorn.Server(config)
-    server.run()
+        config = uvicorn.Config(
+            app=app,
+            host=host,
+            port=port,
+            log_level=log_level,
+            access_log=False,
+            ws="auto",
+            timeout_graceful_shutdown=2,
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    finally:
+        lock.release()
     debug_log("daemon exited")

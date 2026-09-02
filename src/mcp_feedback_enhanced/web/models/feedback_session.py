@@ -175,6 +175,9 @@ class WebFeedbackSession:
         # 新增：活躍標籤頁管理
         self.active_tabs: dict[str, Any] = {}
 
+        # 新增：MCP Context 引用（用於進度通知）
+        self.ctx: Any | None = None
+
         # 新增：用戶設定的會話超時
         self.user_timeout_enabled = False
         self.user_timeout_seconds = 3600  # 預設 1 小時
@@ -214,7 +217,7 @@ class WebFeedbackSession:
 
         # 定義狀態流轉路徑
         next_status_map = {
-            SessionStatus.WAITING: SessionStatus.FEEDBACK_SUBMITTED,
+            SessionStatus.WAITING: SessionStatus.ACTIVE,
             SessionStatus.ACTIVE: SessionStatus.FEEDBACK_SUBMITTED,
             SessionStatus.FEEDBACK_SUBMITTED: SessionStatus.COMPLETED,
             SessionStatus.COMPLETED: None,  # 終態
@@ -685,7 +688,9 @@ class WebFeedbackSession:
         self.settings = settings or {}
         self.images = self._process_images(images)
 
-        self.next_step("已送出反饋，等待下次 MCP 調用")
+        self.status = SessionStatus.FEEDBACK_SUBMITTED
+        self.status_message = "已送出反饋，等待下次 MCP 調用"
+        self.last_activity = time.time()
 
         self.feedback_completed.set()
 
